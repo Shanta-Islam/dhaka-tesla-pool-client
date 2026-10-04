@@ -1,2391 +1,604 @@
-// import { useState, useEffect, useCallback } from "react";
-// import { useForm } from "react-hook-form";
-// import Swal from "sweetalert2";
-// import api from "../../api/axios";
-// import PoolCard from "../Pool/PoolCard";
-
-// // =====================
-// // AUTH HELPER
-// // =====================
-// const authHeaders = () => ({
-//   Authorization: `Bearer ${localStorage.getItem("token")}`,
-// });
-
-// // =====================
-// // PASSENGER DASHBOARD
-// // =====================
-// const PassengerDashboard = ({ user, onLogout }) => {
-//   // ── View state: "pools" | "joinForm" | "activeRide"
-//   const [view, setView] = useState("pools");
-
-//   // ── Pool list
-//   const [pools, setPools] = useState([]);
-//   const [poolsLoading, setPoolsLoading] = useState(true);
-//   const [poolsError, setPoolsError] = useState("");
-
-//   // ── Selected pool (for join form)
-//   const [selectedPool, setSelectedPool] = useState(null);
-
-//   // ── Join form state
-//   const [joining, setJoining] = useState(false);
-
-//   // ── Active ride (passenger's current ride)
-//   const [activeRide, setActiveRide] = useState(null);
-//   const [activeRideLoading, setActiveRideLoading] = useState(false);
-
-//   const {
-//     register,
-//     handleSubmit,
-//     reset,
-//     formState: { errors },
-//   } = useForm({
-//     defaultValues: { seats: 1 },
-//   });
-
-//   // =====================
-//   // FETCH AVAILABLE POOLS
-//   // =====================
-//   const fetchPools = useCallback(async () => {
-//     try {
-//       setPoolsLoading(true);
-//       setPoolsError("");
-//       const response = await api.get("/pools", { headers: authHeaders() });
-//       setPools(response.data.pools || []);
-//     } catch (err) {
-//       console.error("Get pools error:", err);
-//       setPoolsError(
-//         err.response?.data?.message || "Failed to load available pools."
-//       );
-//     } finally {
-//       setPoolsLoading(false);
-//     }
-//   }, []);
-
-//   // =====================
-//   // FETCH ACTIVE RIDE
-//   // =====================
-//   const fetchActiveRide = useCallback(async () => {
-//     try {
-//       setActiveRideLoading(true);
-//       const response = await api.get("/rides/my-ride", {
-//         headers: authHeaders(),
-//       });
-//       const ride = response.data.ride || null;
-//       setActiveRide(ride);
-
-//       // If there is an active ride, switch to that view
-//       if (
-//         ride &&
-//         ["MATCHED", "DRIVER_ARRIVED", "STARTED"].includes(ride.status)
-//       ) {
-//         setView("activeRide");
-//       }
-//     } catch (err) {
-//       // 404 means no active ride — that's fine
-//       if (err.response?.status !== 404) {
-//         console.error("Get active ride error:", err);
-//       }
-//       setActiveRide(null);
-//     } finally {
-//       setActiveRideLoading(false);
-//     }
-//   }, []);
-
-//   useEffect(() => {
-//     fetchPools();
-//     fetchActiveRide();
-//   }, [fetchPools, fetchActiveRide]);
-
-//   // Auto-refresh active ride every 15s when ride is in progress
-//   useEffect(() => {
-//     if (!activeRide) return;
-//     if (activeRide.status === "COMPLETED") return;
-//     const interval = setInterval(fetchActiveRide, 15000);
-//     return () => clearInterval(interval);
-//   }, [fetchActiveRide, activeRide?.status]);
-
-//   // =====================
-//   // SELECT POOL → SHOW FORM
-//   // =====================
-//   const handleSelectPool = (pool) => {
-//     setSelectedPool(pool);
-//     reset({ seats: 1 });
-//     setView("joinForm");
-//   };
-
-//   // =====================
-//   // JOIN POOL
-//   // =====================
-//   const handleJoinPool = async (data) => {
-//     if (!selectedPool) return;
-//     try {
-//       setJoining(true);
-
-//       const response = await api.post(
-//         "/rides",
-//         {
-//           poolId: selectedPool.id,
-//           pickupAddress: data.pickupAddress,
-//           pickupLat: Number(data.pickupLat),
-//           pickupLng: Number(data.pickupLng),
-//           dropoffAddress: data.dropoffAddress,
-//           dropoffLat: Number(data.dropoffLat),
-//           dropoffLng: Number(data.dropoffLng),
-//           seats: Number(data.seats),
-//           estimatedFare: Number(data.estimatedFare),
-//         },
-//         { headers: authHeaders() }
-//       );
-
-//       await Swal.fire({
-//         icon: "success",
-//         title: "Ride Matched! 🎉",
-//         text:
-//           response.data.message ||
-//           "You have successfully joined the pool. Your ride is matched!",
-//         confirmButtonColor: "#f97316",
-//       });
-
-//       await fetchActiveRide();
-//       setView("activeRide");
-//     } catch (err) {
-//       console.error("Join pool error:", err);
-//       Swal.fire({
-//         icon: "error",
-//         title: "Failed to Join",
-//         text: err.response?.data?.message || "Could not join the pool.",
-//         confirmButtonColor: "#f97316",
-//       });
-//     } finally {
-//       setJoining(false);
-//     }
-//   };
-
-//   // =====================
-//   // RIDE STATUS LABEL
-//   // =====================
-//   const rideStatusConfig = {
-//     MATCHED: {
-//       label: "Ride Matched",
-//       color: "bg-blue-100 text-blue-700",
-//       icon: "🎯",
-//       desc: "Your driver will arrive soon.",
-//     },
-//     DRIVER_ARRIVED: {
-//       label: "Driver Arrived",
-//       color: "bg-orange-100 text-orange-700",
-//       icon: "🚗",
-//       desc: "Your driver is at the pickup location!",
-//     },
-//     STARTED: {
-//       label: "Ride Started",
-//       color: "bg-green-100 text-green-700",
-//       icon: "🚀",
-//       desc: "You are on your way.",
-//     },
-//     COMPLETED: {
-//       label: "Ride Completed",
-//       color: "bg-emerald-100 text-emerald-700",
-//       icon: "✅",
-//       desc: "Your ride has been completed. Thank you!",
-//     },
-//   };
-
-//   const passengerName = user?.name || "Passenger";
-//   const initial = passengerName.charAt(0).toUpperCase();
-
-//   // =====================
-//   // RENDER
-//   // =====================
-//   return (
-//     <div className="min-h-screen bg-[#f4f1e8] text-stone-900 font-sans">
-
-//       {/* ====== HEADER ====== */}
-//       <header className="border-b border-stone-200 bg-white sticky top-0 z-10">
-//         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-
-//           <div className="flex items-center gap-3">
-//             <div className="w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow">
-//               <span className="text-base font-black text-amber-400">P</span>
-//             </div>
-//             <p className="text-lg font-black text-black tracking-tight">
-//               PoolDhaka
-//             </p>
-//           </div>
-
-//           <div className="flex items-center gap-3">
-//             {/* Active Ride indicator */}
-//             {activeRide &&
-//               ["MATCHED", "DRIVER_ARRIVED", "STARTED"].includes(
-//                 activeRide.status
-//               ) && (
-//                 <button
-//                   onClick={() => setView("activeRide")}
-//                   className="flex items-center gap-2 rounded-full bg-orange-500 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-orange-600"
-//                 >
-//                   <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-//                   Active Ride
-//                 </button>
-//               )}
-
-//             {/* Nav tabs */}
-//             <button
-//               onClick={() => setView("pools")}
-//               className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-//                 view === "pools"
-//                   ? "bg-stone-900 text-white"
-//                   : "border border-stone-300 hover:bg-stone-50"
-//               }`}
-//             >
-//               Find Pool
-//             </button>
-
-//             <div className="flex items-center gap-2">
-//               <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-700">
-//                 {initial}
-//               </div>
-//               <span className="text-sm font-medium hidden sm:block">
-//                 {passengerName}
-//               </span>
-//             </div>
-
-//             <button
-//               onClick={onLogout}
-//               className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium transition hover:bg-stone-50"
-//             >
-//               Logout
-//             </button>
-//           </div>
-//         </div>
-//       </header>
-
-//       {/* ====== MAIN ====== */}
-//       <main className="mx-auto max-w-5xl px-6 py-8">
-
-//         {/* =====================================
-//             ACTIVE RIDE VIEW
-//         ===================================== */}
-//         {view === "activeRide" && (
-//           <div className="space-y-6">
-
-//             {/* Back button if completed */}
-//             {activeRide?.status === "COMPLETED" && (
-//               <button
-//                 onClick={() => {
-//                   setActiveRide(null);
-//                   setView("pools");
-//                   fetchPools();
-//                 }}
-//                 className="text-sm font-medium text-stone-600 hover:text-stone-900 transition"
-//               >
-//                 ← Find another pool
-//               </button>
-//             )}
-
-//             {activeRideLoading ? (
-//               <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center">
-//                 <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-stone-200 border-t-orange-500" />
-//                 <p className="mt-4 text-sm text-stone-500">
-//                   Loading your ride...
-//                 </p>
-//               </div>
-//             ) : !activeRide ? (
-//               <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center">
-//                 <p className="text-5xl mb-4">🚗</p>
-//                 <h3 className="text-xl font-bold text-stone-800">
-//                   No active ride
-//                 </h3>
-//                 <p className="mt-2 text-sm text-stone-500">
-//                   You don't have an active ride right now.
-//                 </p>
-//                 <button
-//                   onClick={() => setView("pools")}
-//                   className="mt-6 rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition"
-//                 >
-//                   Find a Pool
-//                 </button>
-//               </div>
-//             ) : (
-//               <div className="space-y-5">
-
-//                 {/* Status Card */}
-//                 <div className="rounded-3xl bg-stone-900 text-white p-7 shadow-lg">
-//                   <div className="flex items-center justify-between mb-6">
-//                     <div>
-//                       <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-1">
-//                         Ride Status
-//                       </p>
-//                       <h2 className="text-3xl font-black">
-//                         {rideStatusConfig[activeRide.status]?.icon}{" "}
-//                         {rideStatusConfig[activeRide.status]?.label ||
-//                           activeRide.status}
-//                       </h2>
-//                       <p className="mt-2 text-stone-400 text-sm">
-//                         {rideStatusConfig[activeRide.status]?.desc}
-//                       </p>
-//                     </div>
-
-//                     <span
-//                       className={`rounded-full px-3 py-1 text-xs font-bold ${
-//                         rideStatusConfig[activeRide.status]?.color ||
-//                         "bg-stone-100 text-stone-600"
-//                       }`}
-//                     >
-//                       {activeRide.status}
-//                     </span>
-//                   </div>
-
-//                   {/* Route */}
-//                   <div className="grid grid-cols-2 gap-4">
-//                     <div className="bg-stone-800 rounded-2xl p-4">
-//                       <p className="text-xs text-stone-400 mb-1">Pickup</p>
-//                       <p className="text-sm font-semibold">
-//                         {activeRide.pickupAddress}
-//                       </p>
-//                     </div>
-//                     <div className="bg-stone-800 rounded-2xl p-4">
-//                       <p className="text-xs text-stone-400 mb-1">Drop-off</p>
-//                       <p className="text-sm font-semibold">
-//                         {activeRide.dropoffAddress}
-//                       </p>
-//                     </div>
-//                   </div>
-
-//                   {/* Seats + Fare */}
-//                   <div className="grid grid-cols-2 gap-4 mt-4">
-//                     <div className="bg-stone-800 rounded-2xl p-4">
-//                       <p className="text-xs text-stone-400 mb-1">Seats</p>
-//                       <p className="text-2xl font-black">{activeRide.seats}</p>
-//                     </div>
-//                     <div className="bg-stone-800 rounded-2xl p-4">
-//                       <p className="text-xs text-stone-400 mb-1">Fare</p>
-//                       <p className="text-2xl font-black text-amber-400">
-//                         ৳{activeRide.estimatedFare}
-//                       </p>
-//                     </div>
-//                   </div>
-//                 </div>
-
-//                 {/* Driver + Vehicle Card */}
-//                 {activeRide.pool && (
-//                   <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-//                     <h3 className="text-base font-bold text-stone-800 mb-4">
-//                       Your Driver & Vehicle
-//                     </h3>
-
-//                     <div className="flex items-center gap-4">
-//                       <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-lg font-black text-amber-700 flex-shrink-0">
-//                         {(activeRide.pool.driver?.name || "D")
-//                           .charAt(0)
-//                           .toUpperCase()}
-//                       </div>
-
-//                       <div className="flex-1">
-//                         <p className="font-bold text-stone-900">
-//                           {activeRide.pool.driver?.name || "Driver"}
-//                         </p>
-//                         <p className="text-sm text-stone-500 mt-0.5">
-//                           {activeRide.pool.vehicle?.vehicleName} ·{" "}
-//                           {activeRide.pool.vehicle?.plateNumber}
-//                         </p>
-//                         <p className="text-xs text-stone-400 mt-0.5">
-//                           {activeRide.pool.driver?.phone || ""}
-//                         </p>
-//                       </div>
-
-//                       <div className="text-right">
-//                         <p className="text-xs text-stone-400">Pool Seats</p>
-//                         <p className="font-bold text-stone-900">
-//                           {activeRide.pool.occupiedSeats} /{" "}
-//                           {activeRide.pool.maxCapacity}
-//                         </p>
-//                       </div>
-//                     </div>
-//                   </div>
-//                 )}
-
-//                 {/* Refresh Button */}
-//                 {activeRide.status !== "COMPLETED" && (
-//                   <button
-//                     onClick={fetchActiveRide}
-//                     disabled={activeRideLoading}
-//                     className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-600 hover:bg-stone-50 transition"
-//                   >
-//                     ↻ Refresh Status
-//                   </button>
-//                 )}
-
-//                 {/* Completed: find new pool */}
-//                 {activeRide.status === "COMPLETED" && (
-//                   <button
-//                     onClick={() => {
-//                       setActiveRide(null);
-//                       setView("pools");
-//                       fetchPools();
-//                     }}
-//                     className="w-full rounded-2xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition"
-//                   >
-//                     🎉 Find Another Pool
-//                   </button>
-//                 )}
-//               </div>
-//             )}
-//           </div>
-//         )}
-
-//         {/* =====================================
-//             JOIN FORM VIEW
-//         ===================================== */}
-//         {view === "joinForm" && selectedPool && (
-//           <div>
-//             <button
-//               onClick={() => {
-//                 setSelectedPool(null);
-//                 setView("pools");
-//               }}
-//               className="mb-5 text-sm font-medium text-stone-600 hover:text-stone-900 transition"
-//             >
-//               ← Back to Pools
-//             </button>
-
-//             <div className="rounded-3xl border border-stone-200 bg-white p-7 shadow-sm">
-
-//               <h2 className="text-2xl font-bold text-stone-900">
-//                 Join Pool
-//               </h2>
-
-//               <p className="mt-1 text-sm text-stone-500">
-//                 Enter your pickup, drop-off and seats to join this pool.
-//               </p>
-
-//               {/* Selected Pool Summary */}
-//               <div className="mt-6 rounded-2xl border border-orange-200 bg-orange-50 p-5">
-//                 <div className="flex items-center gap-4">
-//                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-xl">
-//                     🚗
-//                   </div>
-//                   <div>
-//                     <p className="font-bold text-stone-900">
-//                       {selectedPool.vehicle?.vehicleName}
-//                     </p>
-//                     <p className="text-sm text-stone-500 mt-0.5">
-//                       Driver: {selectedPool.driver?.name} ·{" "}
-//                       {selectedPool.vehicle?.plateNumber}
-//                     </p>
-//                     <p className="text-xs text-green-600 font-semibold mt-1">
-//                       {selectedPool.availableSeats} seat(s) available
-//                     </p>
-//                   </div>
-//                 </div>
-//               </div>
-
-//               {/* Route Form */}
-//               <form
-//                 onSubmit={handleSubmit(handleJoinPool)}
-//                 className="mt-7 space-y-5"
-//               >
-//                 {/* Pickup Address */}
-//                 <div>
-//                   <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                     Pickup Address
-//                   </label>
-//                   <input
-//                     type="text"
-//                     placeholder="e.g. Banani Road 11, Dhaka"
-//                     {...register("pickupAddress", {
-//                       required: "Pickup address is required",
-//                     })}
-//                     className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                   />
-//                   {errors.pickupAddress && (
-//                     <p className="mt-1 text-xs text-red-500">
-//                       {errors.pickupAddress.message}
-//                     </p>
-//                   )}
-//                 </div>
-
-//                 {/* Pickup Coordinates */}
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                       Pickup Latitude
-//                     </label>
-//                     <input
-//                       type="number"
-//                       step="any"
-//                       placeholder="23.7937"
-//                       {...register("pickupLat", {
-//                         required: "Pickup latitude is required",
-//                       })}
-//                       className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                     />
-//                     {errors.pickupLat && (
-//                       <p className="mt-1 text-xs text-red-500">
-//                         {errors.pickupLat.message}
-//                       </p>
-//                     )}
-//                   </div>
-//                   <div>
-//                     <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                       Pickup Longitude
-//                     </label>
-//                     <input
-//                       type="number"
-//                       step="any"
-//                       placeholder="90.4066"
-//                       {...register("pickupLng", {
-//                         required: "Pickup longitude is required",
-//                       })}
-//                       className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                     />
-//                     {errors.pickupLng && (
-//                       <p className="mt-1 text-xs text-red-500">
-//                         {errors.pickupLng.message}
-//                       </p>
-//                     )}
-//                   </div>
-//                 </div>
-
-//                 {/* Dropoff Address */}
-//                 <div>
-//                   <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                     Drop-off Address
-//                   </label>
-//                   <input
-//                     type="text"
-//                     placeholder="e.g. Gulshan 2, Dhaka"
-//                     {...register("dropoffAddress", {
-//                       required: "Drop-off address is required",
-//                     })}
-//                     className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                   />
-//                   {errors.dropoffAddress && (
-//                     <p className="mt-1 text-xs text-red-500">
-//                       {errors.dropoffAddress.message}
-//                     </p>
-//                   )}
-//                 </div>
-
-//                 {/* Dropoff Coordinates */}
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                       Drop-off Latitude
-//                     </label>
-//                     <input
-//                       type="number"
-//                       step="any"
-//                       placeholder="23.7925"
-//                       {...register("dropoffLat", {
-//                         required: "Drop-off latitude is required",
-//                       })}
-//                       className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                     />
-//                     {errors.dropoffLat && (
-//                       <p className="mt-1 text-xs text-red-500">
-//                         {errors.dropoffLat.message}
-//                       </p>
-//                     )}
-//                   </div>
-//                   <div>
-//                     <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                       Drop-off Longitude
-//                     </label>
-//                     <input
-//                       type="number"
-//                       step="any"
-//                       placeholder="90.4078"
-//                       {...register("dropoffLng", {
-//                         required: "Drop-off longitude is required",
-//                       })}
-//                       className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                     />
-//                     {errors.dropoffLng && (
-//                       <p className="mt-1 text-xs text-red-500">
-//                         {errors.dropoffLng.message}
-//                       </p>
-//                     )}
-//                   </div>
-//                 </div>
-
-//                 {/* Seats + Fare */}
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                       Number of Seats
-//                     </label>
-//                     <select
-//                       {...register("seats", {
-//                         required: "Please select seats",
-//                         valueAsNumber: true,
-//                       })}
-//                       className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                     >
-//                       <option value={1}>1 Seat</option>
-//                       <option value={2}>2 Seats</option>
-//                       <option value={3}>3 Seats</option>
-//                     </select>
-//                     {errors.seats && (
-//                       <p className="mt-1 text-xs text-red-500">
-//                         {errors.seats.message}
-//                       </p>
-//                     )}
-//                   </div>
-
-//                   <div>
-//                     <label className="text-sm font-medium text-stone-700 block mb-1.5">
-//                       Estimated Fare (৳)
-//                     </label>
-//                     <input
-//                       type="number"
-//                       min="1"
-//                       placeholder="200"
-//                       {...register("estimatedFare", {
-//                         required: "Estimated fare is required",
-//                         valueAsNumber: true,
-//                         min: { value: 1, message: "Fare must be > 0" },
-//                       })}
-//                       className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                     />
-//                     {errors.estimatedFare && (
-//                       <p className="mt-1 text-xs text-red-500">
-//                         {errors.estimatedFare.message}
-//                       </p>
-//                     )}
-//                   </div>
-//                 </div>
-
-//                 {/* Backend checks note */}
-//                 <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
-//                   <p className="text-xs text-blue-700 font-semibold">
-//                     ✓ Pool availability · ✓ Seat check · ✓ Route within 3km · ✓ Duplicate check
-//                   </p>
-//                   <p className="text-xs text-blue-500 mt-0.5">
-//                     All checks are verified automatically when you submit.
-//                   </p>
-//                 </div>
-
-//                 {/* Submit */}
-//                 <button
-//                   type="submit"
-//                   disabled={joining}
-//                   className="w-full rounded-2xl bg-orange-500 px-5 py-4 font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-//                 >
-//                   {joining ? "Joining Pool..." : "Join Pool →"}
-//                 </button>
-//               </form>
-//             </div>
-//           </div>
-//         )}
-
-//         {/* =====================================
-//             AVAILABLE POOLS VIEW
-//         ===================================== */}
-//         {view === "pools" && (
-//           <div>
-//             {/* Page Header */}
-//             <div className="mb-7">
-//               <h1 className="text-3xl font-black text-stone-900">
-//                 Available Pools
-//               </h1>
-//               <p className="mt-2 text-stone-500">
-//                 Select a pool to view driver & vehicle details, then join with
-//                 your pickup and drop-off location.
-//               </p>
-//             </div>
-
-//             {poolsLoading ? (
-//               <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center">
-//                 <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-stone-200 border-t-orange-500" />
-//                 <p className="mt-4 text-sm text-stone-500">
-//                   Loading available pools...
-//                 </p>
-//               </div>
-//             ) : poolsError ? (
-//               <div className="rounded-3xl border border-red-200 bg-red-50 p-8">
-//                 <p className="text-sm text-red-600">{poolsError}</p>
-//                 <button
-//                   onClick={fetchPools}
-//                   className="mt-4 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-800 transition"
-//                 >
-//                   Try Again
-//                 </button>
-//               </div>
-//             ) : pools.length === 0 ? (
-//               <div className="rounded-3xl border border-stone-200 bg-white p-12 text-center">
-//                 <p className="text-5xl mb-4">🚌</p>
-//                 <h3 className="text-xl font-bold text-stone-800">
-//                   No available pools
-//                 </h3>
-//                 <p className="mt-2 text-sm text-stone-500">
-//                   Try again later when a driver creates a pool.
-//                 </p>
-//                 <button
-//                   onClick={fetchPools}
-//                   className="mt-5 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 transition"
-//                 >
-//                   ↻ Refresh
-//                 </button>
-//               </div>
-//             ) : (
-//               <>
-//                 <div className="flex items-center justify-between mb-5">
-//                   <p className="text-sm text-stone-500">
-//                     {pools.length} pool(s) available
-//                   </p>
-//                   <button
-//                     onClick={fetchPools}
-//                     className="text-sm font-medium text-stone-500 hover:text-stone-900 transition"
-//                   >
-//                     ↻ Refresh
-//                   </button>
-//                 </div>
-
-//                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-//                   {pools.map((pool) => (
-//                     <PoolCard
-//                       key={pool.id}
-//                       pool={pool}
-//                       onJoin={handleSelectPool}
-//                     />
-//                   ))}
-//                 </div>
-//               </>
-//             )}
-//           </div>
-//         )}
-//       </main>
-//     </div>
-//   );
-// };
-
-// export default PassengerDashboard;
-
-
-// import { useState } from "react";
-// import { useForm } from "react-hook-form";
-// import {
-//   useMutation,
-//   useQuery,
-//   useQueryClient,
-// } from "@tanstack/react-query";
-// import Swal from "sweetalert2";
-
-// import useAuth from "../../hooks/useAuth";
-// import useAxiosSecure from "../../hooks/useAxiosSecure";
-// import PoolCard from "../Pool/PoolCard";
-
-// const PassengerDashboard = ({ user: propUser, onLogout }) => {
-//   const { user: authUser, logout } = useAuth();
-//   const axiosSecure = useAxiosSecure();
-//   const queryClient = useQueryClient();
-
-//   const user = propUser || authUser;
-
-//   const [view, setView] = useState("pools");
-//   const [selectedPool, setSelectedPool] = useState(null);
-
-//   const {
-//     register,
-//     handleSubmit,
-//     reset,
-//   } = useForm({
-//     defaultValues: {
-//       pickupAddress: "",
-//       pickupLat: "",
-//       pickupLng: "",
-//       dropoffAddress: "",
-//       dropoffLat: "",
-//       dropoffLng: "",
-//       seats: 1,
-//       estimatedFare: "",
-//     },
-//   });
-
-//   // ==========================================
-//   // AVAILABLE POOLS
-//   // ==========================================
-
-//   const {
-//     data: pools = [],
-//     isLoading: poolsLoading,
-//     isError: poolsIsError,
-//     error: poolsError,
-//     refetch: refetchPools,
-//   } = useQuery({
-//     queryKey: ["availablePools"],
-
-//     queryFn: async () => {
-//       const response = await axiosSecure.get("/pools");
-
-//       return response.data.pools || [];
-//     },
-//   });
-
-//   // ==========================================
-//   // ACTIVE RIDE
-//   // ==========================================
-
-//   const {
-//     data: activeRide = null,
-//     isLoading: activeRideLoading,
-//     refetch: refetchActiveRide,
-//   } = useQuery({
-//     queryKey: ["myRides"],
-
-//     queryFn: async () => {
-//       const response = await axiosSecure.get("/rides/my-rides");
-
-//       const rides = response.data.rides || [];
-
-//       const activeStatuses = [
-//         "MATCHED",
-//         "DRIVER_ARRIVED",
-//         "STARTED",
-//       ];
-
-//       return (
-//         rides.find((ride) =>
-//           activeStatuses.includes(ride.status)
-//         ) || null
-//       );
-//     },
-
-//     refetchInterval: (query) => {
-//       const ride = query.state.data;
-
-//       if (
-//         ride &&
-//         ["MATCHED", "DRIVER_ARRIVED", "STARTED"].includes(
-//           ride.status
-//         )
-//       ) {
-//         return 15000;
-//       }
-
-//       return false;
-//     },
-//   });
-
-//   // ==========================================
-//   // JOIN POOL MUTATION
-//   // ==========================================
-
-//   const joinPoolMutation = useMutation({
-//     mutationFn: async ({ pool, data }) => {
-//       // Step 1:
-//       // Create ride request
-//       const rideResponse = await axiosSecure.post("/rides", {
-//         pickupAddress: data.pickupAddress,
-//         pickupLat: Number(data.pickupLat),
-//         pickupLng: Number(data.pickupLng),
-
-//         dropoffAddress: data.dropoffAddress,
-//         dropoffLat: Number(data.dropoffLat),
-//         dropoffLng: Number(data.dropoffLng),
-
-//         seats: Number(data.seats),
-//         estimatedFare: Number(data.estimatedFare),
-//       });
-
-//       const rideRequestId = rideResponse.data.ride?.id;
-
-//       if (!rideRequestId) {
-//         throw new Error(
-//           "Ride request ID was not returned."
-//         );
-//       }
-
-//       // Step 2:
-//       // Join the selected pool
-//       const joinResponse = await axiosSecure.post(
-//         "/pools/join",
-//         {
-//           poolId: pool.id,
-//           rideRequestId,
-//         }
-//       );
-
-//       return joinResponse.data;
-//     },
-
-//     onSuccess: async () => {
-//       // Refresh available pools
-//       await queryClient.invalidateQueries({
-//         queryKey: ["availablePools"],
-//       });
-
-//       // Refresh passenger rides
-//       await queryClient.invalidateQueries({
-//         queryKey: ["myRides"],
-//       });
-
-//       setSelectedPool(null);
-
-//       reset();
-
-//       setView("activeRide");
-
-//       await Swal.fire({
-//         icon: "success",
-//         title: "Ride Matched! 🎉",
-//         text: "You have successfully joined the pool.",
-//         confirmButtonColor: "#f97316",
-//       });
-//     },
-
-//     onError: (error) => {
-//       console.error("Join pool error:", error);
-
-//       Swal.fire({
-//         icon: "error",
-//         title: "Failed to Join",
-//         text:
-//           error.response?.data?.message ||
-//           error.message ||
-//           "Could not join the pool.",
-//         confirmButtonColor: "#f97316",
-//       });
-//     },
-//   });
-
-//   // ==========================================
-//   // SELECT POOL
-//   // ==========================================
-
-//   const handleSelectPool = (pool) => {
-//     setSelectedPool(pool);
-
-//     reset({
-//       pickupAddress: "",
-//       pickupLat: "",
-//       pickupLng: "",
-//       dropoffAddress: "",
-//       dropoffLat: "",
-//       dropoffLng: "",
-//       seats: 1,
-//       estimatedFare: "",
-//     });
-
-//     setView("joinForm");
-//   };
-
-//   // ==========================================
-//   // JOIN POOL
-//   // ==========================================
-
-//   const handleJoinPool = (data) => {
-//     if (!selectedPool) {
-//       Swal.fire({
-//         icon: "warning",
-//         title: "No Pool Selected",
-//         text: "Please select a pool first.",
-//         confirmButtonColor: "#f97316",
-//       });
-
-//       return;
-//     }
-
-//     joinPoolMutation.mutate({
-//       pool: selectedPool,
-//       data,
-//     });
-//   };
-
-//   // ==========================================
-//   // LOGOUT
-//   // ==========================================
-
-//   const handleLogout = () => {
-//     if (onLogout) {
-//       onLogout();
-//     } else {
-//       logout();
-//     }
-//   };
-
-//   // ==========================================
-//   // POOL VIEW
-//   // ==========================================
-
-//   const renderPools = () => {
-//     if (poolsLoading) {
-//       return (
-//         <div className="flex min-h-[300px] items-center justify-center">
-//           <div className="text-center">
-//             <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-orange-200 border-t-orange-500"></div>
-
-//             <p className="text-gray-600">
-//               Loading available pools...
-//             </p>
-//           </div>
-//         </div>
-//       );
-//     }
-
-//     if (poolsIsError) {
-//       return (
-//         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-//           <p className="font-medium text-red-600">
-//             {poolsError?.response?.data?.message ||
-//               "Failed to load available pools."}
-//           </p>
-
-//           <button
-//             type="button"
-//             onClick={() => refetchPools()}
-//             className="mt-4 rounded-lg bg-orange-500 px-5 py-2.5 font-medium text-white transition hover:bg-orange-600"
-//           >
-//             Try Again
-//           </button>
-//         </div>
-//       );
-//     }
-
-//     if (!pools.length) {
-//       return (
-//         <div className="rounded-2xl border border-orange-100 bg-white p-10 text-center shadow-sm">
-//           <div className="mb-4 text-5xl">🚗</div>
-
-//           <h3 className="text-xl font-semibold text-gray-800">
-//             No Available Pools
-//           </h3>
-
-//           <p className="mt-2 text-gray-500">
-//             There are currently no open pools available.
-//           </p>
-
-//           <button
-//             type="button"
-//             onClick={() => refetchPools()}
-//             className="mt-5 rounded-lg bg-orange-500 px-5 py-2.5 font-medium text-white transition hover:bg-orange-600"
-//           >
-//             Refresh
-//           </button>
-//         </div>
-//       );
-//     }
-
-//     return (
-//       <div>
-//         <div className="mb-6 flex items-center justify-between">
-//           <div>
-//             <h2 className="text-2xl font-bold text-gray-800">
-//               Available Pools
-//             </h2>
-
-//             <p className="mt-1 text-sm text-gray-500">
-//               Choose an available driver pool and request a seat.
-//             </p>
-//           </div>
-
-//           <button
-//             type="button"
-//             onClick={() => refetchPools()}
-//             className="rounded-lg border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-orange-600 transition hover:bg-orange-50"
-//           >
-//             ↻ Refresh
-//           </button>
-//         </div>
-
-//         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-//           {pools.map((pool) => (
-//             <PoolCard
-//               key={pool.id}
-//               pool={pool}
-//               onJoin={handleSelectPool}
-//             />
-//           ))}
-//         </div>
-//       </div>
-//     );
-//   };
-
-//   // ==========================================
-//   // JOIN FORM
-//   // ==========================================
-
-//   const renderJoinForm = () => {
-//     if (!selectedPool) {
-//       return (
-//         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-//           <p className="text-gray-600">
-//             Please select a pool first.
-//           </p>
-
-//           <button
-//             type="button"
-//             onClick={() => setView("pools")}
-//             className="mt-4 rounded-lg bg-orange-500 px-5 py-2.5 text-white"
-//           >
-//             Back to Pools
-//           </button>
-//         </div>
-//       );
-//     }
-
-//     return (
-//       <div className="mx-auto max-w-3xl">
-//         <button
-//           type="button"
-//           onClick={() => {
-//             setSelectedPool(null);
-//             setView("pools");
-//           }}
-//           className="mb-5 text-sm font-medium text-orange-600 hover:text-orange-700"
-//         >
-//           ← Back to Available Pools
-//         </button>
-
-//         <div className="rounded-2xl border border-orange-100 bg-white p-6 shadow-sm md:p-8">
-//           <div className="mb-7">
-//             <h2 className="text-2xl font-bold text-gray-800">
-//               Join Pool
-//             </h2>
-
-//             <p className="mt-1 text-gray-500">
-//               Enter your ride details to join this driver's pool.
-//             </p>
-//           </div>
-
-//           {/* Selected Pool */}
-//           <div className="mb-7 rounded-xl bg-orange-50 p-5">
-//             <div className="mb-3 flex items-center justify-between">
-//               <h3 className="font-semibold text-gray-800">
-//                 Selected Pool
-//               </h3>
-
-//               <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-//                 OPEN
-//               </span>
-//             </div>
-
-//             <div className="grid gap-3 sm:grid-cols-2">
-//               <div>
-//                 <p className="text-xs text-gray-500">
-//                   Driver
-//                 </p>
-
-//                 <p className="font-medium text-gray-800">
-//                   {selectedPool.driver?.name || "Driver"}
-//                 </p>
-//               </div>
-
-//               <div>
-//                 <p className="text-xs text-gray-500">
-//                   Vehicle
-//                 </p>
-
-//                 <p className="font-medium text-gray-800">
-//                   {selectedPool.vehicle?.vehicleName ||
-//                     "Tesla"}
-//                 </p>
-//               </div>
-
-//               <div>
-//                 <p className="text-xs text-gray-500">
-//                   Vehicle Type
-//                 </p>
-
-//                 <p className="font-medium text-gray-800">
-//                   {selectedPool.vehicle?.vehicleType ||
-//                     "SEDAN"}
-//                 </p>
-//               </div>
-
-//               <div>
-//                 <p className="text-xs text-gray-500">
-//                   Available Seats
-//                 </p>
-
-//                 <p className="font-medium text-gray-800">
-//                   {selectedPool.availableSeats ??
-//                     selectedPool.maxCapacity}
-//                 </p>
-//               </div>
-//             </div>
-//           </div>
-
-//           <form
-//             onSubmit={handleSubmit(handleJoinPool)}
-//             className="space-y-5"
-//           >
-//             {/* Pickup Address */}
-//             <div>
-//               <label className="mb-2 block text-sm font-medium text-gray-700">
-//                 Pickup Address
-//               </label>
-
-//               <input
-//                 type="text"
-//                 placeholder="e.g. Banani Road 11"
-//                 {...register("pickupAddress", {
-//                   required: "Pickup address is required",
-//                 })}
-//                 className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//               />
-//             </div>
-
-//             {/* Pickup Coordinates */}
-//             <div className="grid gap-4 sm:grid-cols-2">
-//               <div>
-//                 <label className="mb-2 block text-sm font-medium text-gray-700">
-//                   Pickup Latitude
-//                 </label>
-
-//                 <input
-//                   type="number"
-//                   step="any"
-//                   placeholder="e.g. 23.7937"
-//                   {...register("pickupLat", {
-//                     required: "Pickup latitude is required",
-//                   })}
-//                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                 />
-//               </div>
-
-//               <div>
-//                 <label className="mb-2 block text-sm font-medium text-gray-700">
-//                   Pickup Longitude
-//                 </label>
-
-//                 <input
-//                   type="number"
-//                   step="any"
-//                   placeholder="e.g. 90.4066"
-//                   {...register("pickupLng", {
-//                     required: "Pickup longitude is required",
-//                   })}
-//                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                 />
-//               </div>
-//             </div>
-
-//             {/* Dropoff Address */}
-//             <div>
-//               <label className="mb-2 block text-sm font-medium text-gray-700">
-//                 Dropoff Address
-//               </label>
-
-//               <input
-//                 type="text"
-//                 placeholder="e.g. Gulshan 1"
-//                 {...register("dropoffAddress", {
-//                   required: "Dropoff address is required",
-//                 })}
-//                 className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//               />
-//             </div>
-
-//             {/* Dropoff Coordinates */}
-//             <div className="grid gap-4 sm:grid-cols-2">
-//               <div>
-//                 <label className="mb-2 block text-sm font-medium text-gray-700">
-//                   Dropoff Latitude
-//                 </label>
-
-//                 <input
-//                   type="number"
-//                   step="any"
-//                   placeholder="e.g. 23.7806"
-//                   {...register("dropoffLat", {
-//                     required: "Dropoff latitude is required",
-//                   })}
-//                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                 />
-//               </div>
-
-//               <div>
-//                 <label className="mb-2 block text-sm font-medium text-gray-700">
-//                   Dropoff Longitude
-//                 </label>
-
-//                 <input
-//                   type="number"
-//                   step="any"
-//                   placeholder="e.g. 90.4169"
-//                   {...register("dropoffLng", {
-//                     required: "Dropoff longitude is required",
-//                   })}
-//                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                 />
-//               </div>
-//             </div>
-
-//             {/* Seats + Fare */}
-//             <div className="grid gap-4 sm:grid-cols-2">
-//               <div>
-//                 <label className="mb-2 block text-sm font-medium text-gray-700">
-//                   Seats
-//                 </label>
-
-//                 <select
-//                   {...register("seats", {
-//                     required: true,
-//                   })}
-//                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                 >
-//                   <option value="1">
-//                     1 Seat
-//                   </option>
-
-//                   <option value="2">
-//                     2 Seats
-//                   </option>
-
-//                   <option value="3">
-//                     3 Seats
-//                   </option>
-//                 </select>
-//               </div>
-
-//               <div>
-//                 <label className="mb-2 block text-sm font-medium text-gray-700">
-//                   Estimated Fare
-//                 </label>
-
-//                 <input
-//                   type="number"
-//                   min="1"
-//                   placeholder="e.g. 300"
-//                   {...register("estimatedFare", {
-//                     required: "Estimated fare is required",
-//                     min: 1,
-//                   })}
-//                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-//                 />
-//               </div>
-//             </div>
-
-//             {/* Info */}
-//             <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
-//               <p>
-//                 💡 Your pickup and dropoff locations must be
-//                 within the pool's matching distance.
-//               </p>
-
-//               <p className="mt-1">
-//                 The final pool fare will be calculated by the
-//                 backend.
-//               </p>
-//             </div>
-
-//             {/* Buttons */}
-//             <div className="flex flex-col gap-3 pt-3 sm:flex-row">
-//               <button
-//                 type="button"
-//                 onClick={() => {
-//                   setSelectedPool(null);
-//                   setView("pools");
-//                 }}
-//                 className="rounded-lg border border-gray-300 px-5 py-3 font-medium text-gray-700 transition hover:bg-gray-50"
-//               >
-//                 Cancel
-//               </button>
-
-//               <button
-//                 type="submit"
-//                 disabled={joinPoolMutation.isPending}
-//                 className="flex-1 rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-//               >
-//                 {joinPoolMutation.isPending
-//                   ? "Joining Pool..."
-//                   : "Join Pool →"}
-//               </button>
-//             </div>
-//           </form>
-//         </div>
-//       </div>
-//     );
-//   };
-
-//   // ==========================================
-//   // ACTIVE RIDE
-//   // ==========================================
-
-//   const renderActiveRide = () => {
-//     if (activeRideLoading) {
-//       return (
-//         <div className="flex min-h-[300px] items-center justify-center">
-//           <div className="text-center">
-//             <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-orange-200 border-t-orange-500"></div>
-
-//             <p className="text-gray-600">
-//               Loading your active ride...
-//             </p>
-//           </div>
-//         </div>
-//       );
-//     }
-
-//     if (!activeRide) {
-//       return (
-//         <div className="rounded-2xl border border-orange-100 bg-white p-10 text-center shadow-sm">
-//           <div className="mb-4 text-5xl">🚘</div>
-
-//           <h2 className="text-2xl font-bold text-gray-800">
-//             No Active Ride
-//           </h2>
-
-//           <p className="mt-2 text-gray-500">
-//             You don't currently have an active ride.
-//           </p>
-
-//           <button
-//             type="button"
-//             onClick={() => {
-//               setView("pools");
-//               refetchPools();
-//               refetchActiveRide();
-//             }}
-//             className="mt-5 rounded-lg bg-orange-500 px-5 py-2.5 font-medium text-white transition hover:bg-orange-600"
-//           >
-//             Find a Pool
-//           </button>
-//         </div>
-//       );
-//     }
-
-//     return (
-//       <div className="mx-auto max-w-3xl">
-//         <div className="mb-6 flex items-center justify-between">
-//           <div>
-//             <h2 className="text-2xl font-bold text-gray-800">
-//               Active Ride
-//             </h2>
-
-//             <p className="mt-1 text-sm text-gray-500">
-//               Your ride status will update automatically.
-//             </p>
-//           </div>
-
-//           <button
-//             type="button"
-//             onClick={() => refetchActiveRide()}
-//             className="rounded-lg border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-orange-600 hover:bg-orange-50"
-//           >
-//             ↻ Refresh
-//           </button>
-//         </div>
-
-//         {/* Status */}
-//         <div className="mb-5 rounded-2xl bg-white p-6 shadow-sm">
-//           <div className="flex items-center justify-between">
-//             <div>
-//               <p className="text-sm text-gray-500">
-//                 Ride Status
-//               </p>
-
-//               <h3 className="mt-1 text-2xl font-bold text-orange-600">
-//                 {activeRide.status}
-//               </h3>
-//             </div>
-
-//             <div className="rounded-full bg-orange-100 px-4 py-2 text-2xl">
-//               🚗
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Driver */}
-//         <div className="mb-5 rounded-2xl bg-white p-6 shadow-sm">
-//           <h3 className="mb-5 text-lg font-bold text-gray-800">
-//             Driver & Vehicle
-//           </h3>
-
-//           <div className="grid gap-5 sm:grid-cols-2">
-//             <div>
-//               <p className="text-xs text-gray-500">
-//                 Driver
-//               </p>
-
-//               <p className="mt-1 font-semibold text-gray-800">
-//                 {activeRide.pool?.driver?.name ||
-//                   "Driver information unavailable"}
-//               </p>
-
-//               {activeRide.pool?.driver?.phone && (
-//                 <p className="mt-1 text-sm text-gray-500">
-//                   {activeRide.pool.driver.phone}
-//                 </p>
-//               )}
-//             </div>
-
-//             <div>
-//               <p className="text-xs text-gray-500">
-//                 Vehicle
-//               </p>
-
-//               <p className="mt-1 font-semibold text-gray-800">
-//                 {activeRide.pool?.vehicle?.vehicleName ||
-//                   "Vehicle information unavailable"}
-//               </p>
-
-//               {activeRide.pool?.vehicle?.plateNumber && (
-//                 <p className="mt-1 text-sm text-gray-500">
-//                   Plate:{" "}
-//                   {activeRide.pool.vehicle.plateNumber}
-//                 </p>
-//               )}
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Route */}
-//         <div className="mb-5 rounded-2xl bg-white p-6 shadow-sm">
-//           <h3 className="mb-5 text-lg font-bold text-gray-800">
-//             Your Route
-//           </h3>
-
-//           <div className="space-y-5">
-//             <div className="flex gap-4">
-//               <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-500">
-//                 <div className="h-1.5 w-1.5 rounded-full bg-white"></div>
-//               </div>
-
-//               <div>
-//                 <p className="text-xs text-gray-500">
-//                   Pickup
-//                 </p>
-
-//                 <p className="font-medium text-gray-800">
-//                   {activeRide.pickupAddress}
-//                 </p>
-//               </div>
-//             </div>
-
-//             <div className="ml-[7px] h-6 border-l-2 border-dashed border-gray-300"></div>
-
-//             <div className="flex gap-4">
-//               <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500">
-//                 <div className="h-1.5 w-1.5 rounded-full bg-white"></div>
-//               </div>
-
-//               <div>
-//                 <p className="text-xs text-gray-500">
-//                   Dropoff
-//                 </p>
-
-//                 <p className="font-medium text-gray-800">
-//                   {activeRide.dropoffAddress}
-//                 </p>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Ride Info */}
-//         <div className="mb-5 rounded-2xl bg-white p-6 shadow-sm">
-//           <h3 className="mb-5 text-lg font-bold text-gray-800">
-//             Ride Information
-//           </h3>
-
-//           <div className="grid gap-5 sm:grid-cols-3">
-//             <div>
-//               <p className="text-xs text-gray-500">
-//                 Seats
-//               </p>
-
-//               <p className="mt-1 text-lg font-semibold text-gray-800">
-//                 {activeRide.seats}
-//               </p>
-//             </div>
-
-//             <div>
-//               <p className="text-xs text-gray-500">
-//                 Estimated Fare
-//               </p>
-
-//               <p className="mt-1 text-lg font-semibold text-gray-800">
-//                 ৳{activeRide.estimatedFare}
-//               </p>
-//             </div>
-
-//             <div>
-//               <p className="text-xs text-gray-500">
-//                 Pool Fare
-//               </p>
-
-//               <p className="mt-1 text-lg font-semibold text-orange-600">
-//                 ৳
-//                 {activeRide.poolFare ??
-//                   activeRide.membership?.fareAmount ??
-//                   "—"}
-//               </p>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Status message */}
-//         <div className="rounded-2xl border border-orange-100 bg-orange-50 p-5">
-//           {activeRide.status === "MATCHED" && (
-//             <p className="font-medium text-orange-700">
-//               ⏳ Your ride is matched. Please wait for the
-//               driver.
-//             </p>
-//           )}
-
-//           {activeRide.status === "DRIVER_ARRIVED" && (
-//             <p className="font-medium text-orange-700">
-//               📍 The driver has arrived at the pickup point.
-//             </p>
-//           )}
-
-//           {activeRide.status === "STARTED" && (
-//             <p className="font-medium text-orange-700">
-//               🚗 Your ride has started. Have a safe journey!
-//             </p>
-//           )}
-//         </div>
-//       </div>
-//     );
-//   };
-
-//   // ==========================================
-//   // MAIN RENDER
-//   // ==========================================
-
-//   return (
-//     <div className="min-h-screen bg-[#fffaf5]">
-//       {/* Header */}
-//       <header className="sticky top-0 z-30 border-b border-orange-100 bg-white/95 backdrop-blur">
-//         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-//           <div>
-//             <h1 className="text-xl font-bold text-gray-800">
-//               Dhaka Tesla Pool
-//             </h1>
-
-//             <p className="hidden text-xs text-gray-500 sm:block">
-//               Share a seat. Split the fare.
-//             </p>
-//           </div>
-
-//           <div className="flex items-center gap-3">
-//             <button
-//               type="button"
-//               onClick={() => {
-//                 setView("pools");
-//                 setSelectedPool(null);
-//                 refetchPools();
-//               }}
-//               className={`hidden rounded-lg px-4 py-2 text-sm font-medium transition sm:block ${
-//                 view === "pools"
-//                   ? "bg-orange-500 text-white"
-//                   : "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
-//               }`}
-//             >
-//               Find Pool
-//             </button>
-
-//             <button
-//               type="button"
-//               onClick={() => {
-//                 setView("activeRide");
-//                 refetchActiveRide();
-//               }}
-//               className={`relative rounded-lg px-4 py-2 text-sm font-medium transition ${
-//                 view === "activeRide"
-//                   ? "bg-orange-500 text-white"
-//                   : "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
-//               }`}
-//             >
-//               Active Ride
-
-//               {activeRide && (
-//                 <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white"></span>
-//               )}
-//             </button>
-
-//             <div className="hidden text-right md:block">
-//               <p className="text-sm font-semibold text-gray-800">
-//                 {user?.name || "Passenger"}
-//               </p>
-
-//               <p className="text-xs text-gray-500">
-//                 {user?.email}
-//               </p>
-//             </div>
-
-//             <button
-//               type="button"
-//               onClick={handleLogout}
-//               className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-//             >
-//               Logout
-//             </button>
-//           </div>
-//         </div>
-//       </header>
-
-//       {/* Mobile Navigation */}
-//       <div className="border-b border-orange-100 bg-white px-4 py-3 sm:hidden">
-//         <div className="grid grid-cols-2 gap-2">
-//           <button
-//             type="button"
-//             onClick={() => {
-//               setView("pools");
-//               setSelectedPool(null);
-//               refetchPools();
-//             }}
-//             className={`rounded-lg px-3 py-2 text-sm font-medium ${
-//               view === "pools"
-//                 ? "bg-orange-500 text-white"
-//                 : "bg-gray-100 text-gray-600"
-//             }`}
-//           >
-//             Find Pool
-//           </button>
-
-//           <button
-//             type="button"
-//             onClick={() => {
-//               setView("activeRide");
-//               refetchActiveRide();
-//             }}
-//             className={`rounded-lg px-3 py-2 text-sm font-medium ${
-//               view === "activeRide"
-//                 ? "bg-orange-500 text-white"
-//                 : "bg-gray-100 text-gray-600"
-//             }`}
-//           >
-//             Active Ride
-//           </button>
-//         </div>
-//       </div>
-
-//       {/* Main */}
-//       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-//         {view === "pools" && renderPools()}
-
-//         {view === "joinForm" && renderJoinForm()}
-
-//         {view === "activeRide" && renderActiveRide()}
-//       </main>
-//     </div>
-//   );
-// };
-
-// export default PassengerDashboard;
-
-
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import useAxiosSecure from "../../hooks/useAxiosSecure";
-import PoolCard from '../Pool/PoolCard';
-import Swal from 'sweetalert2';
+import jashimDriver from "../../assets/driver.jpg";
+import Swal from "sweetalert2";
 
+/* ── helpers ── */
+const SectionLabel = ({ children }) => (
+  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--green)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
+    {children}
+  </div>
+);
+
+const StatusTag = ({ status }) => {
+  const cfg = {
+    MATCHED: { bg: "rgba(59,130,246,0.15)", color: "#60a5fa" },
+    DRIVER_ARRIVED: { bg: "rgba(249,115,22,0.15)", color: "#fb923c" },
+    STARTED: { bg: "rgba(0,232,122,0.15)", color: "var(--green)" },
+    COMPLETED: { bg: "rgba(0,232,122,0.1)", color: "var(--green)" },
+    CANCELLED: { bg: "rgba(239,68,68,0.15)", color: "#f87171" },
+    REQUESTED: { bg: "rgba(255,255,255,0.06)", color: "#888" },
+  };
+  const c = cfg[status] || cfg.REQUESTED;
+  return (
+    <span style={{ fontSize: 10, fontWeight: 800, background: c.bg, color: c.color, borderRadius: 20, padding: "3px 10px", letterSpacing: 1 }}>
+      {status}
+    </span>
+  );
+};
+
+const LOCATIONS = [
+  { label: "Banani Road 11", lat: 23.7938, lng: 90.4066 },
+  { label: "Mohakhali", lat: 23.7751, lng: 90.4042 },
+  { label: "Gulshan 1", lat: 23.7806, lng: 90.4169 },
+  { label: "Gulshan 2", lat: 23.7938, lng: 90.4160 },
+  { label: "Banani", lat: 23.7945, lng: 90.4055 },
+  { label: "Baridhara", lat: 23.8028, lng: 90.4229 },
+];
+
+const FARE_PER_KM = 22;
+
+/* ─── PASSENGER DASHBOARD ─────────────────────────────── */
 const PassengerDashboard = ({ user, onLogout }) => {
   const axiosSecure = useAxiosSecure();
-
-  const [view, setView] = useState("pools");
+  const [view, setView] = useState("book");
   const [selectedPool, setSelectedPool] = useState(null);
+  const [seats, setSeats] = useState(1);
+  const [pickupIdx, setPickupIdx] = useState(0);
+  const [dropIdx, setDropIdx] = useState(2);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
-  const {
-    data: pools = [],
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
+  /* fetch pools */
+  const { data: pools = [], isLoading: poolsLoading, isError, error, refetch } = useQuery({
     queryKey: ["availablePools"],
     queryFn: async () => {
-      const response = await axiosSecure.get("/pools");
-
-      return response.data.pools || [];
+      const r = await axiosSecure.get("/pools");
+      return r.data.pools || [];
     },
   });
-  console.log(pools);
 
-  const {
-    data: myRides = [],
-    isLoading: ridesLoading,
-    isError: ridesError,
-  } = useQuery({
+  /* fetch rides */
+  const { data: myRides = [], isLoading: ridesLoading, refetch: refetchRides } = useQuery({
     queryKey: ["myRides"],
     queryFn: async () => {
-      const response = await axiosSecure.get("/rides/my-rides");
-
-      return response.data.rides || [];
+      const r = await axiosSecure.get("/rides/my-rides");
+      return r.data.rides || [];
     },
     refetchInterval: 15000,
   });
 
-  const handleSelectPool = (pool) => {
-    console.log("Selected pool:", pool);
-
-    setSelectedPool(pool);
-    setView("joinForm");
-  };
-
-  const handleRideRequestSubmit = async (data) => {
-    try {
-      const response = await axiosSecure.post("/rides", {
-        pickupAddress: data.pickupAddress,
-        pickupLat: Number(data.pickupLat),
-        pickupLng: Number(data.pickupLng),
-        dropoffAddress: data.dropoffAddress,
-        dropoffLat: Number(data.dropoffLat),
-        dropoffLng: Number(data.dropoffLng),
-        seats: Number(data.seats),
-        estimatedFare: Number(data.estimatedFare),
-      });
-
-      console.log("Ride created:", response.data);
-      const ride = response.data.ride;
-
-      const joinResponse = await axiosSecure.post("/pools/join", {
-        poolId: selectedPool.id,
-        rideRequestId: ride.id,
-      });
-
-      console.log("Pool joined:", joinResponse.data);
-      await Swal.fire({
-        icon: "success",
-        title: "Pool Joined!",
-        text: "You have successfully joined the pool.",
-        confirmButtonColor: "#f97316",
-      });
-
-      reset();
-
-      setSelectedPool(null);
-      setView("activeRide");
-
-    } catch (error) {
-      console.error("Ride request error:", error);
-
-      Swal.fire({
-        icon: "error",
-        title: "Failed!",
-        text:
-          error.response?.data?.message ||
-          "Failed to create ride request.",
-        confirmButtonColor: "#f97316",
-      });
-    }
-  };
-  const activeRide = myRides.find(
-    (ride) =>
-      ride.status === "MATCHED" ||
-      ride.status === "DRIVER_ARRIVED" ||
-      ride.status === "STARTED"
-  );
+  const activeRide = myRides.find(r => ["MATCHED", "DRIVER_ARRIVED", "STARTED"].includes(r.status));
+  const recentRides = myRides.filter(r => ["COMPLETED", "CANCELLED"].includes(r.status)).slice(0, 3);
 
   useEffect(() => {
     if (ridesLoading) return;
-
-    if (activeRide) {
-      setView("activeRide");
-    } else {
-      setView("pools");
-    }
+    if (activeRide) setView("activeRide");
+    else setView("book");
   }, [activeRide, ridesLoading]);
 
-  // =========================
-  // LOGOUT
-  // =========================
+  /* fare estimate */
+  const pickupLoc = LOCATIONS[pickupIdx];
+  const dropLoc = LOCATIONS[dropIdx];
+  const distKm = (() => {
+    const R = 6371;
+    const dLat = ((dropLoc.lat - pickupLoc.lat) * Math.PI) / 180;
+    const dLng = ((dropLoc.lng - pickupLoc.lng) * Math.PI) / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(pickupLoc.lat*Math.PI/180)*Math.cos(dropLoc.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+  })();
+  const fareEst = Math.round(distKm * FARE_PER_KM);
+  const durationMin = Math.round(distKm * 2.4);
 
-  const handleLogout = () => {
-    onLogout();
+  /* submit ride */
+  const handleRideSubmit = async () => {
+    if (!selectedPool && pools.length > 0) {
+      setSelectedPool(pools[0]);
+    }
+    const pool = selectedPool || pools[0];
+    if (!pool) {
+      Swal.fire({ icon: "warning", title: "No pool available", text: "No open pools found right now.", confirmButtonColor: "#00e87a" });
+      return;
+    }
+    try {
+      const rideRes = await axiosSecure.post("/rides", {
+        pickupAddress: pickupLoc.label,
+        pickupLat: pickupLoc.lat, pickupLng: pickupLoc.lng,
+        dropoffAddress: dropLoc.label,
+        dropoffLat: dropLoc.lat, dropoffLng: dropLoc.lng,
+        seats, estimatedFare: fareEst,
+      });
+      await axiosSecure.post("/pools/join", {
+        poolId: pool.id,
+        rideRequestId: rideRes.data.ride.id,
+      });
+      await Swal.fire({ icon: "success", title: "Ride Confirmed!", text: "Your shared ride has been booked.", confirmButtonColor: "#00e87a" });
+      refetchRides();
+      setView("activeRide");
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message || "Could not book ride.", confirmButtonColor: "#00e87a" });
+    }
   };
 
+  if (poolsLoading || ridesLoading) return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+      <div style={{ width: 36, height: 36, border: "3px solid var(--border2)", borderTop: "3px solid var(--green)", borderRadius: "50%" }} className="spin" />
+    </div>
+  );
 
-  // =========================
-  // LOADING
-  // =========================
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f4f1e8] text-slate-900">
-        <header className="border-b border-stone-200 bg-white">
-          <div className="mx-auto max-w-7xl px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow">
-                <span className="text-base font-black text-amber-400">
-                  P
-                </span>
-              </div>
-
-              <p className="text-lg font-black text-black tracking-tight">
-                PoolDhaka
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-7xl px-6 py-12">
-          <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center shadow-sm">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-stone-200 border-t-orange-500" />
-
-            <p className="mt-4 text-sm text-stone-500">
-              Loading available pools...
-            </p>
-          </div>
-        </main>
+  if (isError) return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
+      <Header user={user} onLogout={onLogout} />
+      <div style={{ padding: 40 }}>
+        <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, padding: 24, maxWidth: 480 }}>
+          <h3 style={{ color: "#f87171", fontWeight: 700 }}>Failed to load pools</h3>
+          <p style={{ color: "var(--text-muted)", marginTop: 8, fontSize: 13 }}>{error?.response?.data?.message || "Something went wrong."}</p>
+          <button onClick={() => refetch()} style={greenBtn}>Try Again</button>
+        </div>
       </div>
-    );
-  }
-  // =========================
-  // POOL ERROR
-  // =========================
+    </div>
+  );
 
-  if (isError) {
-    return (
-      <div className="min-h-screen bg-[#f4f1e8] text-slate-900">
-        <header className="border-b border-stone-200 ">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow">
-                <span className="text-base font-black text-amber-400">
-                  P
-                </span>
-              </div>
-
-              <p className="text-lg font-black text-black tracking-tight">
-                PoolDhaka
-              </p>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-50"
-            >
-              Logout
-            </button>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-7xl px-6 py-8">
-          <div className="rounded-3xl border border-red-200 bg-red-50 p-8">
-            <h2 className="text-lg font-bold text-red-700">
-              Failed to load pools
-            </h2>
-
-            <p className="mt-2 text-sm text-red-600">
-              {error?.response?.data?.message ||
-                "Something went wrong."}
-            </p>
-
-            <button
-              onClick={() => refetch()}
-              className="mt-5 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-600"
-            >
-              Try Again
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  /* ── layout: left sidebar + main ── */
   return (
-    <div className="min-h-screen bg-[#f4f1e8] text-slate-900">
+    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
+      <Header user={user} onLogout={onLogout} />
 
-      {/* =========================================
-          HEADER
-      ========================================= */}
+      <div style={{ flex: 1, display: "flex" }}>
 
-      <header className="border-b border-stone-200">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow">
-              <span className="text-base font-black text-amber-400">
-                P
-              </span>
+        {/* LEFT SIDEBAR — booking form */}
+        <div style={{
+          width: 280, background: "var(--bg2)", borderRight: "1px solid var(--border)",
+          display: "flex", flexDirection: "column", flexShrink: 0, overflow: "auto",
+        }}>
+      
+          {/* Journey form */}
+          <div style={{ padding: "20px 20px", flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <SectionLabel>YOUR JOURNEY</SectionLabel>
+                <h2 style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>Book a shared ride</h2>
+              </div>
+              <span style={{ fontSize: 18 }}>⇌</span>
             </div>
 
-            <p className="text-lg font-black text-black tracking-tight">
-              PoolDhaka
-            </p>
+            {/* Pickup */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={lblStyle}>PICKUP LOCATION</label>
+              <div style={{ position: "relative" }}>
+                <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 5, background: "rgba(0,232,122,0.2)", border: "1.5px solid var(--green)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 8, fontWeight: 800, color: "var(--green)" }}>A</span>
+                </div>
+                <select value={pickupIdx} onChange={e => setPickupIdx(Number(e.target.value))} style={selectStyle}>
+                  {LOCATIONS.map((l, i) => <option key={i} value={i}>{l.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Destination */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={lblStyle}>DESTINATION</label>
+              <div style={{ position: "relative" }}>
+                <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 5, background: "rgba(255,255,255,0.06)", border: "1.5px solid var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 8, fontWeight: 800, color: "var(--text-muted)" }}>B</span>
+                </div>
+                <select value={dropIdx} onChange={e => setDropIdx(Number(e.target.value))} style={selectStyle}>
+                  {LOCATIONS.map((l, i) => <option key={i} value={i}>{l.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Seats */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={lblStyle}>SEATS</label>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1a1a1a", border: "1px solid var(--border2)", borderRadius: 8, padding: "10px 14px" }}>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{seats} rider{seats > 1 ? "s" : ""}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button onClick={() => setSeats(s => Math.max(1, s - 1))} style={seatBtnStyle}>−</button>
+                  <span style={{ fontSize: 16, fontWeight: 800, minWidth: 20, textAlign: "center" }}>{seats}</span>
+                  <button onClick={() => setSeats(s => Math.min(3, s + 1))} style={seatBtnStyle}>+</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Fare estimate */}
+            <div style={{ background: "rgba(0,232,122,0.06)", border: "1px solid rgba(0,232,122,0.2)", borderRadius: 10, padding: 14, marginBottom: 18 }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>FARE ESTIMATE</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff" }}>৳{fareEst * seats}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>৳{fareEst} / seat · {durationMin} min · {distKm} km</div>
+            </div>
+
+            {/* Pool picker */}
+            {pools.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={lblStyle}>SELECT POOL</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {pools.slice(0, 3).map(p => (
+                    <button key={p.id} onClick={() => setSelectedPool(p)} style={{
+                      background: selectedPool?.id === p.id ? "rgba(0,232,122,0.1)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${selectedPool?.id === p.id ? "var(--green)" : "var(--border)"}`,
+                      borderRadius: 8, padding: "10px 12px", textAlign: "left", cursor: "pointer",
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: selectedPool?.id === p.id ? "var(--green)" : "#fff" }}>
+                        {p.vehicle?.vehicleName || "Shared Vehicle"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                        {p.availableSeats ?? p.maxCapacity} seats free · {p.vehicle?.plateNumber}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CTA */}
+            <button onClick={handleRideSubmit} style={{
+              width: "100%", padding: "13px 0", borderRadius: 8,
+              background: "var(--green)", color: "#000", fontWeight: 800, fontSize: 13,
+              border: "none", cursor: "pointer", letterSpacing: 0.5,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}>
+              CONFIRM SHARED RIDE ↗
+            </button>
           </div>
 
-          <div className="flex items-center gap-3">
-
-            <button
-              onClick={handleLogout}
-              className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium transition hover:bg-stone-50"
-            >
-              Logout
-            </button>
-
+          {/* Recent rides */}
+          <div style={{ padding: "0 20px 20px" }}>
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16, marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>RECENT RIDES</span>
+                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>Last 30 days</span>
+              </div>
+            </div>
+            {recentRides.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-dim)" }}>No recent rides.</p>
+            ) : recentRides.map(r => (
+              <div key={r.id} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700 }}>{r.pickupAddress} → {r.dropoffAddress}</span>
+                  {r.estimatedFare && <span style={{ fontSize: 12, fontWeight: 800, color: r.status === "CANCELLED" ? "var(--text-dim)" : "var(--green)" }}>
+                    {r.status === "CANCELLED" ? "—" : `৳${r.estimatedFare}`}
+                  </span>}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                  <StatusTag status={r.status} />
+                  <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                    {new Date(r.createdAt).toLocaleDateString("en-BD", { day: "numeric", month: "short" })} · {new Date(r.createdAt).toLocaleTimeString("en-BD", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </header>
-      {/* =========================================
-          MAIN
-      ========================================= */}
 
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[1fr_280px]">
+        {/* MAIN AREA */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }} className="grid-bg">
 
-        {/* =========================================
-            LEFT CONTENT
-        ========================================= */}
-
-        <section>
-          {view === "pools" && (
-            <div>
-              {pools.map((pool) => (
-                <PoolCard
-                  key={pool.id}
-                  pool={pool}
-                  onJoin={handleSelectPool}
-                />
-              ))}
-            </div>
-          )}
-
-          {view === "joinForm" && selectedPool && (
-            <>
-              <div className="rounded-3xl border border-stone-200 bg-[#f4f1e8] p-8 shadow-sm">
-                {/* <button
-                onClick={() => {
-                  setSelectedPool(null);
-                  setView("pools");
-                }}
-                className="mb-6 text-sm font-semibold text-orange-600 hover:text-orange-700"
-              >
-                ← Back to Pools
-              </button> */}
-
-                <h2 className="text-2xl font-black text-stone-900">
-                  Ride Request
+          {/* ─── BOOK VIEW: route visualization ─── */}
+          {(view === "book" || view === "pools") && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              {/* Top: Live ride badge or header */}
+              <div style={{ padding: "28px 40px 0" }}>
+                <SectionLabel>YOUR ROUTE</SectionLabel>
+                <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: -1, marginBottom: 4 }}>
+                  {pickupLoc.label} → {dropLoc.label}
                 </h2>
-
-                <p className="mt-2 text-sm text-stone-500">
-                  You selected a pool with{" "}
-                  <span className="font-semibold text-stone-700">
-                    {selectedPool.driver?.name}
-                  </span>
-                </p>
-
-                <div className="mt-6 rounded-2xl  p-5">
-                  <p className="text-sm text-stone-500">
-                    Vehicle
-                  </p>
-
-                  <p className="mt-1 font-bold text-stone-900">
-                    {selectedPool.vehicle?.vehicleName}
-                  </p>
-
-                  <p className="mt-1 text-sm text-stone-500">
-                    {selectedPool.vehicle?.vehicleType} ·{" "}
-                    {selectedPool.vehicle?.plateNumber}
-                  </p>
-
-                  <p className="mt-3 text-sm font-semibold text-green-600">
-                    {selectedPool.availableSeats} seats available
-                  </p>
-                </div>
-              </div>
-              <form
-                onSubmit={handleSubmit(handleRideRequestSubmit)}
-                className="mt-6 space-y-5"
-              >
-                <div>
-                  <label className="text-sm font-semibold text-stone-700">
-                    Pickup Address
-                  </label>
-
-                  <input
-                    {...register("pickupAddress", {
-                      required: "Pickup address is required",
-                    })}
-                    placeholder="e.g. Banani Road 11"
-                    className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                  />
-
-                  {errors.pickupAddress && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.pickupAddress.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-sm font-semibold text-stone-700">
-                      Pickup Latitude
-                    </label>
-
-                    <input
-                      type="number"
-                      step="any"
-                      {...register("pickupLat", {
-                        required: "Pickup latitude is required",
-                      })}
-                      placeholder="23.7937"
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-semibold text-stone-700">
-                      Pickup Longitude
-                    </label>
-
-                    <input
-                      type="number"
-                      step="any"
-                      {...register("pickupLng", {
-                        required: "Pickup longitude is required",
-                      })}
-                      placeholder="90.4066"
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-stone-700">
-                    Dropoff Address
-                  </label>
-
-                  <input
-                    {...register("dropoffAddress", {
-                      required: "Dropoff address is required",
-                    })}
-                    placeholder="e.g. Gulshan 1"
-                    className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                  />
-
-                  {errors.dropoffAddress && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.dropoffAddress.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-sm font-semibold text-stone-700">
-                      Dropoff Latitude
-                    </label>
-
-                    <input
-                      type="number"
-                      step="any"
-                      {...register("dropoffLat", {
-                        required: "Dropoff latitude is required",
-                      })}
-                      placeholder="23.7806"
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-semibold text-stone-700">
-                      Dropoff Longitude
-                    </label>
-
-                    <input
-                      type="number"
-                      step="any"
-                      {...register("dropoffLng", {
-                        required: "Dropoff longitude is required",
-                      })}
-                      placeholder="90.4169"
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-stone-700">
-                    Number of Seats
-                  </label>
-
-                  <select
-                    {...register("seats", {
-                      required: "Please select seats",
-                    })}
-                    className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                  >
-                    <option value="">Select seats</option>
-                    <option value="1">1 Seat</option>
-                    <option value="2">2 Seats</option>
-                    <option value="3">3 Seats</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-stone-700">
-                    Estimated Fare
-                  </label>
-
-                  <input
-                    type="number"
-                    {...register("estimatedFare", {
-                      required: "Estimated fare is required",
-                      min: {
-                        value: 1,
-                        message: "Fare must be greater than 0",
-                      },
-                    })}
-                    placeholder="300"
-                    className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-orange-500"
-                  />
-
-                  {errors.estimatedFare && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.estimatedFare.message}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-orange-500 px-5 py-3 font-semibold text-white transition hover:bg-orange-600"
-                >
-                  Request Ride
-                </button>
-              </form>
-            </>
-          )}
-
-          {view === "activeRide" && (
-            <div className="rounded-3xl border border-stone-200 bg-[#f4f1e8] p-8 shadow-sm">
-
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black text-stone-900">
-                    Active Ride
-                  </h2>
-
-                  <p className="mt-1 text-sm text-stone-500">
-                    Your ride is being processed.
-                  </p>
-                </div>
-
-                {activeRide && (
-                  <span className="rounded-full bg-orange-100 px-4 py-2 text-sm font-bold text-orange-700">
-                    {activeRide.status.replaceAll("_", " ")}
-                  </span>
-                )}
               </div>
 
-              {ridesLoading ? (
-                <div className="mt-8 text-sm text-stone-500">
-                  Loading ride details...
-                </div>
-              ) : !activeRide ? (
-                <div className="mt-8 rounded-2xl  p-6 text-center">
-                  <p className="font-semibold text-stone-700">
-                    No active ride found.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-8 space-y-6">
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-                    <div className="rounded-2xl  p-5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                        Pickup
-                      </p>
-
-                      <p className="mt-2 font-bold text-stone-900">
-                        {activeRide.pickupAddress}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl  p-5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                        Dropoff
-                      </p>
-
-                      <p className="mt-2 font-bold text-stone-900">
-                        {activeRide.dropoffAddress}
-                      </p>
-                    </div>
-
+              {/* Route diagram */}
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px" }}>
+                <div style={{ width: "100%", maxWidth: 640 }}>
+                  {/* Route stops */}
+                  <div style={{ display: "flex", alignItems: "center", marginBottom: 60 }}>
+                    <RouteStop letter="A" color="var(--green)" label="PICKUP" sublabel={pickupLoc.label} />
+                    <div style={{ flex: 1, height: 1.5, background: "var(--border2)", margin: "0 0 24px" }} />
+                    <RouteStop letter="M" color="#f97316" label="VIA" sublabel="Mohakhali" />
+                    <div style={{ flex: 1, height: 1.5, background: "var(--border2)", margin: "0 0 24px" }} />
+                    <RouteStop letter="B" color="var(--text-muted)" label="DROP-OFF" sublabel={dropLoc.label} />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-
-                    <div>
-                      <p className="text-xs text-stone-400">
-                        Seats
-                      </p>
-
-                      <p className="mt-1 font-bold text-stone-900">
-                        {activeRide.seats}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-stone-400">
-                        Estimated Fare
-                      </p>
-
-                      <p className="mt-1 font-bold text-stone-900">
-                        ৳{activeRide.estimatedFare}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-stone-400">
-                        Ride Status
-                      </p>
-
-                      <p className="mt-1 font-bold text-orange-600">
-                        {activeRide.status.replaceAll("_", " ")}
-                      </p>
-                    </div>
-
+                  {/* Stats */}
+                  <div style={{ display: "flex", gap: 1, borderTop: "1px solid var(--border)" }}>
+                    {[
+                      { value: durationMin, label: "MINUTES" },
+                      { value: distKm, label: "KILOMETRES" },
+                      { value: pools.length, label: "POOLS OPEN" },
+                    ].map((s, i) => (
+                      <div key={i} style={{ flex: 1, padding: "24px 0", borderRight: i < 2 ? "1px solid var(--border)" : "none", textAlign: i === 0 ? "left" : i === 2 ? "right" : "center" }}>
+                        <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1, lineHeight: 1 }}>{s.value}</div>
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 2, marginTop: 4 }}>{s.label}</div>
+                      </div>
+                    ))}
                   </div>
+                </div>
+              </div>
 
+              {/* Pool list */}
+              {pools.length > 0 && (
+                <div style={{ padding: "0 40px 32px" }}>
+                  <SectionLabel>YOUR POOL</SectionLabel>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {pools.map(p => {
+                      const members = p.members || [];
+                      const occupiedSeats = members.reduce((a, m) => a + (m.rideRequest?.seats || 0), 0);
+                      const totalSeats = p.maxCapacity || 3;
+                      return (
+                        <div key={p.id} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${selectedPool?.id === p.id ? "var(--green)" : "var(--border)"}`, borderRadius: 12, padding: "16px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <img src={jashimDriver} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover" }} />
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: 14 }}>{p.driver?.name || "Driver"}</div>
+                                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                                  {p.vehicle?.vehicleName} · {p.vehicle?.plateNumber}
+                                </div>
+                                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 1 }}>
+                                  {p.vehicle?.vehicleType}
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              {members.map((m, i) => (
+                                <div key={i} style={{ fontSize: 11, fontWeight: 700, background: "rgba(0,232,122,0.15)", color: "var(--green)", borderRadius: 20, padding: "3px 10px" }}>
+                                  {m.passenger?.name?.split(" ")[0] || "Passenger"} {i === 0 && members.length > 1 ? "· You" : "· Matched"}
+                                </div>
+                              ))}
+                              {[...Array(Math.max(0, totalSeats - members.length))].map((_, i) => (
+                                <div key={`empty-${i}`} style={{ fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,0.05)", color: "var(--text-dim)", borderRadius: 20, padding: "3px 10px" }}>
+                                  Seat {members.length + i + 1} · Open
+                                </div>
+                              ))}
+                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 6 }}>
+                                {occupiedSeats}/{totalSeats} seats matched
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-        </section>
-
-        {/* =========================================
-            RIGHT SIDEBAR
-        ========================================= */}
-
-        <aside className="space-y-5">
-
-          {/* PASSENGER INFO */}
-
-          <div className="rounded-3xl border border-stone-200 bg-[#fffcef] p-6 shadow-sm">
-
-            <div className="flex items-center gap-4">
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-lg font-bold text-orange-700">
-                {user?.name
-                  ?.charAt(0)
-                  ?.toUpperCase() || "D"}
+          {/* ─── ACTIVE RIDE VIEW ─── */}
+          {view === "activeRide" && activeRide && (
+            <div style={{ padding: "28px 40px" }} className="fade-in">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--green)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
+                    LIVE RIDE / {activeRide.id?.slice(0, 5).toUpperCase()}
+                  </div>
+                  <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: -1 }}>Your route</h2>
+                  <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>
+                    {activeRide.pickupAddress} → {activeRide.dropoffAddress}
+                  </div>
+                </div>
               </div>
 
-              <div className="min-w-0">
-
-                <p className="truncate font-bold">
-                  {user?.name || "Passenger"}
-                </p>
-
-                <p className="truncate text-sm text-stone-500">
-                  Passenger
-                </p>
-
+              {/* Status banner */}
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: "rgba(0,232,122,0.1)", border: "1px solid rgba(0,232,122,0.3)",
+                borderRadius: 20, padding: "6px 16px", marginBottom: 40, fontSize: 13, fontWeight: 600, color: "var(--green)",
+              }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)" }} className="pulse-dot" />
+                {activeRide.status === "MATCHED" && "Driver matched · ETA 4 min"}
+                {activeRide.status === "DRIVER_ARRIVED" && "Driver arrived · ETA 4 min"}
+                {activeRide.status === "STARTED" && "Ride in progress"}
               </div>
 
+              {/* Route diagram */}
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 0, maxWidth: 600 }}>
+                <RouteStop letter="A" color="var(--green)" label="PICKUP" sublabel={activeRide.pickupAddress} />
+                <div style={{ flex: 1, height: 1.5, background: "var(--green)", margin: "0 0 24px", opacity: 0.4 }} />
+                <RouteStop letter="M" color="#f97316" label="VIA" sublabel="Mohakhali" />
+                <div style={{ flex: 1, height: 1.5, background: "var(--border2)", margin: "0 0 24px" }} />
+                <RouteStop letter="B" color="var(--text-muted)" label="DROP-OFF" sublabel={activeRide.dropoffAddress} />
+              </div>
+
+              {/* Stats */}
+              <div style={{ display: "flex", gap: 1, borderTop: "1px solid var(--border)", marginBottom: 40, maxWidth: 600 }}>
+                {[
+                  { value: "18", label: "MINUTES" },
+                  { value: "7.4", label: "KILOMETRES" },
+                  { value: "3", label: "STOPS" },
+                ].map((s, i) => (
+                  <div key={i} style={{ flex: 1, padding: "20px 0", borderRight: i < 2 ? "1px solid var(--border)" : "none", textAlign: i === 0 ? "left" : i === 2 ? "right" : "center" }}>
+                    <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 2, marginTop: 4 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pool info */}
+              {activeRide.pool && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: "var(--text-muted)" }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      <span style={{ fontSize: 14, fontWeight: 700 }}>Your pool</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: "var(--green)", fontWeight: 700 }}>
+                      {activeRide.pool.members?.length || 0}/{activeRide.pool.maxCapacity} seats matched
+                    </span>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <img src={jashimDriver} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover" }} />
+                        <div>
+                          <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+                            {activeRide.pool.driver?.name || "Driver"}
+                            <span style={{ fontSize: 12, color: "#f59e0b" }}>★ 4.9</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                            {activeRide.pool.vehicle?.vehicleType} · {activeRide.pool.vehicle?.plateNumber}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 1 }}>
+                            Battery-powered · {activeRide.pool.maxCapacity} seats
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxWidth: 260 }}>
+                        {(activeRide.pool.members || []).map((m, i) => (
+                          <div key={i} style={{ fontSize: 11, fontWeight: 700, background: i === 0 ? "rgba(0,232,122,0.15)" : "rgba(255,255,255,0.06)", color: i === 0 ? "var(--green)" : "var(--text-muted)", borderRadius: 20, padding: "4px 12px" }}>
+                            {m.passenger?.name?.split(" ")[0] || "Passenger"}{i === 0 ? " · You" : " · Matched"}
+                          </div>
+                        ))}
+                        {[...Array(Math.max(0, (activeRide.pool.maxCapacity || 3) - (activeRide.pool.members?.length || 0)))].map((_, i) => (
+                          <div key={`open-${i}`} style={{ fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,0.04)", color: "var(--text-dim)", borderRadius: 20, padding: "4px 12px" }}>
+                            Seat {(activeRide.pool.members?.length || 0) + i + 1} · Open
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fare info */}
+              <div style={{ marginTop: 24, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, maxWidth: 600 }}>
+                {[
+                  { label: "FARE", value: `৳${activeRide.estimatedFare}` },
+                  { label: "SEATS", value: activeRide.seats },
+                  { label: "STATUS", value: activeRide.status },
+                ].map(s => (
+                  <div key={s.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>{s.label}</div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: s.label === "STATUS" ? "var(--green)" : "#fff" }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
             </div>
+          )}
 
-            {user?.email && (
-              <p className="mt-4 truncate text-xs text-stone-400">
-                {user.email}
-              </p>
-            )}
-
+          {/* Bottom breadcrumb */}
+          <div style={{
+            padding: "12px 40px", borderTop: "1px solid var(--border)",
+            display: "flex", gap: 8, alignItems: "center",
+            fontSize: 10, color: "var(--text-dim)", fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase",
+            marginTop: "auto",
+          }}>
+            <span>DHANMONDI</span><span style={{ color: "var(--green)" }}>→</span>
+            <span>FARMGATE</span><span style={{ color: "var(--green)" }}>→</span>
+            <span>TEJGAON</span><span style={{ color: "var(--green)" }}>→</span>
+            <span>RAMPURA</span><span style={{ color: "var(--green)" }}>→</span>
+            <span>BADDA</span>
           </div>
-        </aside>
-      </main>
+        </div>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default PassengerDashboard
+/* ── sub components ── */
+const Header = ({ user, onLogout }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <header style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "0 32px", height: 56, borderBottom: "1px solid var(--border)",
+      background: "var(--bg)", flexShrink: 0,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 7, background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontWeight: 900, fontSize: 15, color: "#000" }}>P</span>
+        </div>
+        <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: -0.5 }}>PoolDhaka</span>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--green)" }} />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ border: "1px solid var(--border2)", borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: 0.5 }}>
+          PASSENGER
+        </div>
+
+        {/* Avatar dropdown */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setOpen(o => !o)}
+            style={{
+              width: 34, height: 34, borderRadius: "50%",
+              background: "#333", border: "2px solid transparent",
+              cursor: "pointer", fontWeight: 800, fontSize: 13, color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "border-color 0.15s",
+            }}
+          >
+            {user?.name?.charAt(0)?.toUpperCase() || "P"}
+          </button>
+          {open && (
+            <>
+              <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
+              <div style={{
+                position: "absolute", right: 0, top: 42,
+                background: "#1e1e1e", border: "1px solid var(--border2)",
+                borderRadius: 10, padding: 4, minWidth: 160, zIndex: 100,
+                boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
+              }}>
+                <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{user?.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{user?.email}</div>
+                </div>
+                <button
+                  onClick={() => { setOpen(false); onLogout(); }}
+                  style={{
+                    width: "100%", padding: "9px 12px", background: "none",
+                    border: "none", color: "#f87171", fontSize: 13, fontWeight: 600,
+                    textAlign: "left", cursor: "pointer", borderRadius: 6,
+                  }}
+                >
+                  Log out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+};
+
+const RouteStop = ({ letter, color, label, sublabel }) => (
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 90 }}>
+    <div style={{ width: 48, height: 48, borderRadius: 8, border: `1.5px solid ${color}`, display: "flex", alignItems: "center", justifyContent: "center", background: `${color}18` }}>
+      <span style={{ fontWeight: 800, fontSize: 16, color }}>{letter}</span>
+    </div>
+    <div style={{ textAlign: "center" }}>
+      <div style={{ fontSize: 9, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{sublabel}</div>
+    </div>
+  </div>
+);
+
+/* ── style constants ── */
+const greenBtn = {
+  width: "100%", padding: "11px 0", borderRadius: 8,
+  background: "var(--green)", color: "#000", fontWeight: 800,
+  fontSize: 13, border: "none", cursor: "pointer", marginTop: 12,
+};
+
+const lblStyle = {
+  fontSize: 10, fontWeight: 700, color: "var(--text-muted)", letterSpacing: 1.5,
+  textTransform: "uppercase", display: "block", marginBottom: 6,
+};
+
+const selectStyle = {
+  width: "100%", padding: "10px 14px 10px 38px",
+  background: "#1a1a1a", border: "1px solid var(--border2)",
+  borderRadius: 8, color: "#fff", fontSize: 13, outline: "none",
+  appearance: "none",
+};
+
+const seatBtnStyle = {
+  width: 26, height: 26, borderRadius: 6, background: "rgba(255,255,255,0.08)",
+  border: "1px solid var(--border2)", color: "#fff", fontSize: 16,
+  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+  lineHeight: 1,
+};
+
+export default PassengerDashboard;

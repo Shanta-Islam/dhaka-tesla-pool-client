@@ -2,1252 +2,614 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import Swal from "sweetalert2";
-
 import useAxiosSecure from "../../hooks/useAxiosSecure";
+import jashimDriver from "../../assets/driver.jpg";
 
+/* ─── small reusable pieces ───────────────────────────── */
+const Logo = ({ onLogout, user }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <header style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "0 32px", height: 56, borderBottom: "1px solid var(--border)",
+      background: "var(--bg)", position: "sticky", top: 0, zIndex: 50,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 7, background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontWeight: 900, fontSize: 15, color: "#000" }}>P</span>
+        </div>
+        <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: -0.5 }}>PoolDhaka</span>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--green)" }} />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ border: "1px solid var(--border2)", borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: 0.5 }}>
+          DRIVER
+        </div>
+
+        {/* Avatar dropdown */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setOpen(o => !o)}
+            style={{
+              width: 34, height: 34, borderRadius: "50%",
+              background: "var(--green)", border: "2px solid transparent",
+              cursor: "pointer", fontWeight: 800, fontSize: 13, color: "#000",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "border-color 0.15s",
+            }}
+          >
+            {user?.name?.charAt(0)?.toUpperCase() || "D"}
+          </button>
+          {open && (
+            <>
+              {/* backdrop */}
+              <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
+              <div style={{
+                position: "absolute", right: 0, top: 42,
+                background: "#1e1e1e", border: "1px solid var(--border2)",
+                borderRadius: 10, padding: 4, minWidth: 160, zIndex: 100,
+                boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
+              }}>
+                <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{user?.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{user?.email}</div>
+                </div>
+                <button
+                  onClick={() => { setOpen(false); onLogout(); }}
+                  style={{
+                    width: "100%", padding: "9px 12px", background: "none",
+                    border: "none", color: "#f87171", fontSize: 13, fontWeight: 600,
+                    textAlign: "left", cursor: "pointer", borderRadius: 6,
+                  }}
+                >
+                  Log out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+};
+
+const SectionLabel = ({ children }) => (
+  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--green)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
+    {children}
+  </div>
+);
+
+const StatusBadge = ({ status }) => {
+  const cfg = {
+    COMPLETED: { color: "var(--green)", label: "COMPLETED" },
+    CANCELLED: { color: "#ef4444", label: "CANCELLED" },
+    MATCHED: { color: "#3b82f6", label: "MATCHED" },
+    STARTED: { color: "#f97316", label: "STARTED" },
+  };
+  const c = cfg[status] || { color: "var(--text-muted)", label: status };
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, color: c.color, letterSpacing: 1 }}>{c.label}</span>
+  );
+};
+
+/* ─── DRIVER DASHBOARD ────────────────────────────────── */
 const DriverDashboard = ({ user, onLogout }) => {
   const axiosSecure = useAxiosSecure();
-
   const [view, setView] = useState("vehicles");
   const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-  // =========================
-  // VEHICLE FORM
-  // =========================
+  const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm();
-
-  // =========================
-  // GET MY VEHICLES
-  // =========================
-
-  const {
-    data: vehicles = [],
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
+  /* fetch vehicles */
+  const { data: vehicles = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["myVehicles"],
     queryFn: async () => {
-      const response = await axiosSecure.get("/vehicles");
-
-      return response.data.vehicles || [];
+      const r = await axiosSecure.get("/vehicles");
+      return r.data.vehicles || [];
     },
   });
 
-  // =========================
-  // ADD VEHICLE
-  // =========================
-
-  const handleAddVehicle = async (data) => {
-    try {
-      await axiosSecure.post("/vehicles", {
-        vehicleName: data.vehicleName,
-        vehicleType: data.vehicleType,
-        plateNumber: data.plateNumber,
-        capacity: Number(data.capacity),
-      });
-
-      await Swal.fire({
-        icon: "success",
-        title: "Vehicle Added!",
-        text: "Your vehicle has been added successfully.",
-        confirmButtonColor: "#f97316",
-      });
-
-      reset();
-
-      await refetch();
-
-      setView("vehicles");
-    } catch (error) {
-      console.error("Add vehicle error:", error);
-
-      Swal.fire({
-        icon: "error",
-        title: "Failed!",
-        text:
-          error.response?.data?.message ||
-          "Failed to add vehicle.",
-        confirmButtonColor: "#f97316",
-      });
-    }
-  };
-
-  // =========================
-  // DELETE VEHICLE
-  // =========================
-
-  const handleDeleteVehicle = async (vehicleId) => {
-    const result = await Swal.fire({
-      title: "Delete Vehicle?",
-      text: "Are you sure you want to delete this vehicle?",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#64748b",
-      confirmButtonText: "Yes, Delete",
-      cancelButtonText: "Cancel",
-    });
-
-    if (!result.isConfirmed) {
-      return;
-    }
-
-    try {
-      await axiosSecure.delete(`/vehicles/${vehicleId}`);
-
-      await Swal.fire({
-        icon: "success",
-        title: "Deleted!",
-        text: "Vehicle deleted successfully.",
-        confirmButtonColor: "#f97316",
-      });
-
-      await refetch();
-
-      if (selectedVehicle?.id === vehicleId) {
-        setSelectedVehicle(null);
-      }
-    } catch (error) {
-      console.error("Delete vehicle error:", error);
-
-      Swal.fire({
-        icon: "error",
-        title: "Delete Failed",
-        text:
-          error.response?.data?.message ||
-          "Failed to delete vehicle.",
-        confirmButtonColor: "#f97316",
-      });
-    }
-  };
-
-  // =========================
-  // SELECT VEHICLE
-  // =========================
-
-  const handleSelectVehicle = (vehicle) => {
-    setSelectedVehicle(vehicle);
-    setView("createPool");
-  };
-
-  // =========================
-  // GET MY POOL
-  // =========================
-  const {
-    data: currentPool,
-    isLoading: poolLoading,
-    refetch: refetchMyPool,
-  } = useQuery({
+  /* fetch pool */
+  const { data: currentPool, isLoading: poolLoading, refetch: refetchPool } = useQuery({
     queryKey: ["myPool"],
     queryFn: async () => {
-      const response = await axiosSecure.get("/pools/my-pool");
-      return response.data.pool;
+      const r = await axiosSecure.get("/pools/my-pool");
+      return r.data.pool;
     },
     retry: false,
   });
 
-  // Auto-switch to currentPool view when active pool exists on load
+  const hasActivePool = currentPool && ["OPEN", "FULL", "IN_PROGRESS"].includes(currentPool.status);
+
   useEffect(() => {
-    if (
-      !poolLoading &&
-      currentPool &&
-      ["OPEN", "FULL", "IN_PROGRESS"].includes(currentPool.status) &&
-      view === "vehicles"
-    ) {
+    if (!poolLoading && currentPool && ["OPEN", "FULL", "IN_PROGRESS"].includes(currentPool.status) && view === "vehicles") {
       setView("currentPool");
     }
-  // Only run once after pool data loads
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolLoading, currentPool]);
 
-  const hasActivePool =
-    currentPool &&
-    ["OPEN", "FULL", "IN_PROGRESS"].includes(currentPool.status);
-
-  // =========================
-  // CREATE POOL
-  // =========================
-
-  const handleCreatePool = async (event) => {
-    event.preventDefault();
-
-    if (!selectedVehicle) {
-      Swal.fire({
-        icon: "warning",
-        title: "Select a Vehicle",
-        text: "Please select a vehicle before creating a pool.",
-        confirmButtonColor: "#f97316",
-      });
-
-      return;
-    }
-
+  /* add vehicle */
+  const handleAddVehicle = async (data) => {
     try {
-      await axiosSecure.post("/pools", {
-        vehicleId: selectedVehicle.id,
-        maxCapacity: selectedVehicle.capacity,
+      await axiosSecure.post("/vehicles", {
+        vehicleName: data.vehicleName, vehicleType: data.vehicleType,
+        plateNumber: data.plateNumber, capacity: Number(data.capacity),
       });
+      await Swal.fire({ icon: "success", title: "Vehicle Added!", confirmButtonColor: "#00e87a" });
+      reset(); await refetch(); setView("vehicles");
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message || "Failed to add vehicle.", confirmButtonColor: "#00e87a" });
+    }
+  };
 
-      // Refresh current pool data
-      await refetchMyPool();
+  /* delete vehicle */
+  const handleDeleteVehicle = async (id) => {
+    const r = await Swal.fire({ title: "Delete Vehicle?", icon: "warning", showCancelButton: true, confirmButtonColor: "#ef4444", cancelButtonColor: "#333", confirmButtonText: "Delete" });
+    if (!r.isConfirmed) return;
+    try {
+      await axiosSecure.delete(`/vehicles/${id}`);
+      await Swal.fire({ icon: "success", title: "Deleted!", confirmButtonColor: "#00e87a" });
+      await refetch();
+      if (selectedVehicle?.id === id) setSelectedVehicle(null);
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message, confirmButtonColor: "#00e87a" });
+    }
+  };
 
-      await Swal.fire({
-        icon: "success",
-        title: "Pool Created!",
-        text: "Your ride pool is now open for passengers.",
-        confirmButtonColor: "#f97316",
-      });
-
+  /* create pool */
+  const handleCreatePool = async (e) => {
+    e.preventDefault();
+    if (!selectedVehicle) return;
+    try {
+      await axiosSecure.post("/pools", { vehicleId: selectedVehicle.id, maxCapacity: selectedVehicle.capacity });
+      await refetchPool();
+      await Swal.fire({ icon: "success", title: "Pool Created!", confirmButtonColor: "#00e87a" });
       setView("currentPool");
-    } catch (error) {
-      console.error("Create pool error:", error);
-
-      Swal.fire({
-        icon: "error",
-        title: "Failed!",
-        text:
-          error.response?.data?.message ||
-          "Failed to create pool.",
-        confirmButtonColor: "#f97316",
-      });
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message, confirmButtonColor: "#00e87a" });
     }
   };
 
-
-  // =========================
-  // HANDLE DRIVER ARRIVED
-  // =========================
-
-  const handleDriverArrived = async (rideRequestId) => {
+  const handleDriverArrived = async (rideId) => {
     try {
-      await axiosSecure.patch("/rides/driver-arrived", {
-        rideRequestId,
-      });
-
-      await refetchMyPool();
-
-      Swal.fire({
-        icon: "success",
-        title: "Driver Arrived",
-        text: "You have arrived at the passenger pickup location.",
-        confirmButtonColor: "#f97316",
-      });
-    } catch (error) {
-      console.error("Driver arrived error:", error);
-
-      Swal.fire({
-        icon: "error",
-        title: "Failed!",
-        text:
-          error.response?.data?.message ||
-          "Failed to update ride status.",
-        confirmButtonColor: "#f97316",
-      });
+      await axiosSecure.patch("/rides/driver-arrived", { rideRequestId: rideId });
+      await refetchPool();
+      Swal.fire({ icon: "success", title: "Driver Arrived", confirmButtonColor: "#00e87a" });
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message, confirmButtonColor: "#00e87a" });
     }
   };
 
-  // =========================
-  // HANDLE START RIDE
-  // =========================
-
-  const handleStartRide = async (rideRequestId) => {
+  const handleStartRide = async (rideId) => {
     try {
-      await axiosSecure.patch("/rides/start", {
-        rideRequestId,
-      });
-
-      await refetchMyPool();
-
-      Swal.fire({
-        icon: "success",
-        title: "Ride Started",
-        text: "The ride has been started successfully.",
-        confirmButtonColor: "#f97316",
-      });
-    } catch (error) {
-      console.error("Start ride error:", error);
-
-      Swal.fire({
-        icon: "error",
-        title: "Failed!",
-        text:
-          error.response?.data?.message ||
-          "Failed to start ride.",
-        confirmButtonColor: "#f97316",
-      });
+      await axiosSecure.patch("/rides/start", { rideRequestId: rideId });
+      await refetchPool();
+      Swal.fire({ icon: "success", title: "Ride Started", confirmButtonColor: "#00e87a" });
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message, confirmButtonColor: "#00e87a" });
     }
   };
-  // =========================
-  // HANDLE COMPLETE RIDE
-  // =========================
- const handleCompleteRide = async (rideRequestId) => {
-  try {
-    const response = await axiosSecure.patch("/rides/complete", {
-      rideRequestId,
-    });
 
-    await Swal.fire({
-      icon: "success",
-      title: "Ride Completed",
-      text: response.data.message || "Ride completed successfully.",
-      confirmButtonColor: "#f97316",
-    });
-
-    await refetchMyPool();
-
-    // Pool completed হলে Current Pool থেকে Vehicles page-এ ফিরে যাবে
-    if (response.data.pool?.status === "COMPLETED") {
-      setView("vehicles");
+  const handleCompleteRide = async (rideId) => {
+    try {
+      const res = await axiosSecure.patch("/rides/complete", { rideRequestId: rideId });
+      await Swal.fire({ icon: "success", title: "Ride Completed", confirmButtonColor: "#00e87a" });
+      await refetchPool();
+      if (res.data.pool?.status === "COMPLETED") setView("vehicles");
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message, confirmButtonColor: "#00e87a" });
     }
-  } catch (error) {
-    console.error("Complete ride error:", error);
-
-    Swal.fire({
-      icon: "error",
-      title: "Failed!",
-      text:
-        error.response?.data?.message ||
-        "Failed to complete ride.",
-      confirmButtonColor: "#f97316",
-    });
-  }
-};
-
-  // =========================
-  // LOGOUT
-  // =========================
-
-  const handleLogout = () => {
-    onLogout();
   };
 
-  // =========================
-  // LOADING
-  // =========================
+  if (isLoading) return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+      <div style={{ width: 36, height: 36, border: "3px solid var(--border2)", borderTop: "3px solid var(--green)", borderRadius: "50%" }} className="spin" />
+    </div>
+  );
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f4f1e8] text-slate-900">
-        <header className="border-b border-stone-200 bg-white">
-          <div className="mx-auto max-w-7xl px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow">
-                <span className="text-base font-black text-amber-400">
-                  P
-                </span>
-              </div>
-
-              <p className="text-lg font-black text-black tracking-tight">
-                PoolDhaka
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-7xl px-6 py-12">
-          <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center shadow-sm">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-stone-200 border-t-orange-500" />
-
-            <p className="mt-4 text-sm text-stone-500">
-              Loading your vehicles...
-            </p>
-          </div>
-        </main>
+  if (isError) return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
+      <Logo user={user} onLogout={onLogout} />
+      <div style={{ padding: "40px 32px" }}>
+        <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, padding: 24, maxWidth: 480 }}>
+          <h3 style={{ color: "#f87171", fontWeight: 700 }}>Failed to load vehicles</h3>
+          <p style={{ color: "var(--text-muted)", marginTop: 8, fontSize: 13 }}>{error?.response?.data?.message || "Something went wrong."}</p>
+          <button onClick={() => refetch()} style={greenBtnStyle}>Try Again</button>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // =========================
-  // VEHICLE ERROR
-  // =========================
-
-  if (isError) {
-    return (
-      <div className="min-h-screen bg-[#f4f1e8] text-slate-900">
-        <header className="border-b border-stone-200 ">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow">
-                <span className="text-base font-black text-amber-400">
-                  P
-                </span>
-              </div>
-
-              <p className="text-lg font-black text-black tracking-tight">
-                PoolDhaka
-              </p>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-50"
-            >
-              Logout
-            </button>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-7xl px-6 py-8">
-          <div className="rounded-3xl border border-red-200 bg-red-50 p-8">
-            <h2 className="text-lg font-bold text-red-700">
-              Failed to load vehicles
-            </h2>
-
-            <p className="mt-2 text-sm text-red-600">
-              {error?.response?.data?.message ||
-                "Something went wrong."}
-            </p>
-
-            <button
-              onClick={() => refetch()}
-              className="mt-5 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-600"
-            >
-              Try Again
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  /* recent rides (last few from pool members) */
+  const recentRides = currentPool?.members?.flatMap(m => m.rideRequest ? [m.rideRequest] : []) || [];
 
   return (
-    <div className="min-h-screen bg-[#f4f1e8] text-slate-900">
+    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
+      <Logo user={user} onLogout={onLogout} />
 
-      {/* =========================================
-          HEADER
-      ========================================= */}
+      {/* Body: 2-column */}
+      <div style={{ flex: 1, display: "flex" }}>
 
-      <header className="border-b border-stone-200">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        {/* Left main */}
+        <div style={{ flex: 1, borderRight: "1px solid var(--border)", padding: "32px 40px", overflow: "auto" }} className="grid-bg">
 
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow">
-              <span className="text-base font-black text-amber-400">
-                P
-              </span>
+          {/* Page header */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 40 }}>
+            <div>
+              <SectionLabel>DRIVER CONSOLE / DHAKA</SectionLabel>
+              <h1 style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1.5, lineHeight: 1 }}>Your vehicles</h1>
+              <p style={{ color: "var(--text-muted)", marginTop: 8, fontSize: 13 }}>Manage your rides across the city.</p>
             </div>
-
-            <p className="text-lg font-black text-black tracking-tight">
-              PoolDhaka
-            </p>
+            {hasActivePool && (
+              <div style={{
+                border: "1px solid var(--border2)", borderRadius: 8,
+                padding: "6px 14px", fontSize: 12, fontWeight: 600,
+                color: "var(--text-muted)", cursor: "pointer",
+              }} onClick={() => setView("currentPool")}>
+                {currentPool.status === "OPEN" ? "● Active pool" : `● ${currentPool.status}`}
+              </div>
+            )}
+            {!hasActivePool && (
+              <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
+                No active pool
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
-
-            <button
-              onClick={handleLogout}
-              className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium transition hover:bg-stone-50"
-            >
-              Logout
-            </button>
-
-          </div>
-        </div>
-      </header>
-
-      {/* =========================================
-          MAIN
-      ========================================= */}
-
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[1fr_280px]">
-
-        {/* =========================================
-            LEFT CONTENT
-        ========================================= */}
-
-        <section>
-
-          {/* =====================================
-              VEHICLES VIEW
-          ===================================== */}
-
+          {/* ─── VEHICLES VIEW ─── */}
           {view === "vehicles" && (
-            <section>
+            <div className="fade-in">
               {vehicles.length === 0 ? (
-                // No vehicle state
-                <div className="rounded-3xl border border-stone-200 bg-[#fffcef]  p-10 text-center">
-                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-3xl">
-                    🚗
-                  </div>
-
-                  <h2 className="text-2xl font-bold text-stone-800">
-                    No Vehicles Yet
-                  </h2>
-
-                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-500">
-                    Add your vehicle to start creating ride pools for passengers.
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() => setView("addVehicle")}
-                    className="mt-6 rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
-                  >
-                    + Add Vehicle
+                <div>
+                  <button onClick={() => setView("addVehicle")} style={{
+                    width: 52, height: 52, borderRadius: 10,
+                    border: "1.5px solid var(--green)", background: "rgba(0,232,122,0.06)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", marginBottom: 24,
+                  }}>
+                    <span style={{ fontSize: 24, color: "var(--green)", lineHeight: 1 }}>+</span>
                   </button>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>No vehicles yet</h2>
+                  <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 24 }}>Add your vehicle to open a shared ride.</p>
+                  <button onClick={() => setView("addVehicle")} style={greenBtnStyle}>+ Add vehicle</button>
                 </div>
               ) : (
-                // Vehicle exists
-                <>
-
-
-                  <div className=" bg-[#fffcef] p-6 rounded-3xl border border-stone-200 shadow-sm">
-                    <div className="mb-6 flex items-center justify-between">
-                      <div>
-                        <h2 className="text-2xl font-bold text-stone-800">
-                          My Vehicles
-                        </h2>
-
-                        <p className="mt-1 text-sm text-stone-500">
-                          Manage your vehicles and create ride pools.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setView("addVehicle")}
-                        className="rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
-                      >
-                        + Add Vehicle
-                      </button>
-                    </div>
-
-                    {vehicles.map((vehicle) => (
-                      <div
-                        key={vehicle.id}
-                        className="rounded-3xl border border-stone-200 bg-[#fffcef] p-6"
-                      >
-                        <h3 className="text-lg font-bold text-stone-800">
-                          {vehicle.vehicleName}
-                        </h3>
-
-                        <p className="mt-1 text-sm text-stone-500">
-                          {vehicle.vehicleType}
-                        </p>
-
-                        <div className="mt-4 space-y-2 text-sm text-stone-600">
-                          <p>
-                            <span className="font-medium">Plate:</span>{" "}
-                            {vehicle.plateNumber}
-                          </p>
-
-                          <p>
-                            <span className="font-medium">Capacity:</span>{" "}
-                            {vehicle.capacity} seats
-                          </p>
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16, marginBottom: 32 }}>
+                    {vehicles.map(v => (
+                      <div key={v.id} style={cardStyle}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: 16 }}>{v.vehicleName}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{v.vehicleType}</div>
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", border: "1px solid var(--green)", borderRadius: 5, padding: "3px 8px" }}>
+                            {v.capacity} seats
+                          </div>
                         </div>
-
-                        <div className="mt-6 flex gap-3">
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 20 }}>
+                          <span style={{ color: "var(--text-muted)" }}>Plate: </span>{v.plateNumber}
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
                           <button
-                            type="button"
                             disabled={hasActivePool}
-                            onClick={() => handleSelectVehicle(vehicle)}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold ${hasActivePool
-                              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                              : "bg-orange-500 text-white hover:bg-orange-600"
-                              }`}
-                          >
+                            onClick={() => { setSelectedVehicle(v); setView("createPool"); }}
+                            style={{ ...greenBtnStyle, flex: 1, opacity: hasActivePool ? 0.4 : 1, cursor: hasActivePool ? "not-allowed" : "pointer" }}>
                             {hasActivePool ? "Pool Active" : "Create Pool"}
                           </button>
-
-                          {!hasActivePool && (<button
-                            type="button"
-                            disabled={hasActivePool}
-                            onClick={() => handleDeleteVehicle(vehicle.id)}
-                            className="rounded-xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-500 hover:bg-red-50"
-                          >
-                            Delete
-                          </button>)}
+                          {!hasActivePool && (
+                            <button onClick={() => handleDeleteVehicle(v.id)} style={ghostBtnStyle}>Delete</button>
+                          )}
                         </div>
                       </div>
                     ))}
+                    {/* Add vehicle card */}
+                    <button onClick={() => setView("addVehicle")} style={{
+                      ...cardStyle, border: "1.5px dashed var(--border2)",
+                      display: "flex", flexDirection: "column", alignItems: "center",
+                      justifyContent: "center", gap: 8, cursor: "pointer",
+                      background: "transparent", minHeight: 160,
+                    }}>
+                      <span style={{ fontSize: 28, color: "var(--text-dim)" }}>+</span>
+                      <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>Add vehicle</span>
+                    </button>
                   </div>
-                </>
+                </div>
               )}
-            </section>
+            </div>
           )}
 
-          {/* =====================================
-              ADD VEHICLE VIEW
-          ===================================== */}
-
+          {/* ─── ADD VEHICLE ─── */}
           {view === "addVehicle" && (
-            <div>
-              <div className="rounded-3xl border border-stone-200 bg-[#fffcef]  p-7 shadow-sm">
-
-                <h2 className="text-2xl font-bold">
-                  Add Vehicle
-                </h2>
-
-                <p className="mt-1 text-sm text-stone-500">
-                  Add your vehicle before creating a pool.
-                </p>
-
-                <form
-                  onSubmit={handleSubmit(
-                    handleAddVehicle
-                  )}
-                  className="mt-7 space-y-5"
-                >
-
-                  {/* Vehicle Name */}
-
+            <div className="fade-in" style={{ maxWidth: 480 }}>
+              <button onClick={() => setView("vehicles")} style={backBtnStyle}>← Back to vehicles</button>
+              <div style={cardStyle}>
+                <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Add Vehicle</h2>
+                <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 28 }}>Add your vehicle before creating a pool.</p>
+                <form onSubmit={handleSubmit(handleAddVehicle)} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                  {[
+                    { name: "vehicleName", label: "VEHICLE NAME", ph: "Bullet" },
+                    { name: "vehicleType", label: "VEHICLE TYPE", ph: "Battery-powered · 3 seats" },
+                    { name: "plateNumber", label: "PLATE NUMBER", ph: "DHAKA-M-12-841" },
+                  ].map(f => (
+                    <div key={f.name}>
+                      <label style={labelStyle}>{f.label}</label>
+                      <input type="text" placeholder={f.ph}
+                        {...register(f.name, { required: `${f.label} is required` })}
+                        style={inputStyle(errors[f.name])} />
+                      {errors[f.name] && <p style={errStyle}>{errors[f.name].message}</p>}
+                    </div>
+                  ))}
                   <div>
-                    <label className="text-sm font-medium">
-                      Vehicle Name
-                    </label>
-
-                    <input
-                      type="text"
-                      placeholder="Enter vehicle name"
-                      {...register("vehicleName", {
-                        required:
-                          "Vehicle name is required",
-                      })}
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                    />
-
-                    {errors.vehicleName && (
-                      <p className="mt-1 text-xs text-red-500">
-                        {errors.vehicleName.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Vehicle Type */}
-
-                  <div>
-                    <label className="text-sm font-medium">
-                      Vehicle Type
-                    </label>
-
-                    <input
-                      type="text"
-                      placeholder="Enter vehicle type"
-                      {...register("vehicleType", {
-                        required:
-                          "Vehicle type is required",
-                      })}
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 uppercase outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                    />
-
-                    {errors.vehicleType && (
-                      <p className="mt-1 text-xs text-red-500">
-                        {errors.vehicleType.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Plate Number */}
-
-                  <div>
-                    <label className="text-sm font-medium">
-                      Plate Number
-                    </label>
-
-                    <input
-                      type="text"
-                      placeholder="Enter plate number"
-                      {...register("plateNumber", {
-                        required:
-                          "Plate number is required",
-                      })}
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 uppercase outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                    />
-
-                    {errors.plateNumber && (
-                      <p className="mt-1 text-xs text-red-500">
-                        {errors.plateNumber.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Capacity */}
-
-                  <div>
-                    <label className="text-sm font-medium">
-                      Capacity
-                    </label>
-
-                    <input
-                      type="number"
-                      min="1"
-                      max="3"
-                      placeholder="Maximum 3 seats"
+                    <label style={labelStyle}>CAPACITY (max 3)</label>
+                    <input type="number" min="1" max="3" placeholder="3"
                       {...register("capacity", {
-                        required:
-                          "Capacity is required",
-                        valueAsNumber: true,
-                        min: {
-                          value: 1,
-                          message:
-                            "Capacity must be at least 1",
-                        },
-                        max: {
-                          value: 3,
-                          message:
-                            "Capacity cannot exceed 3",
-                        },
+                        required: "Capacity is required", valueAsNumber: true,
+                        min: { value: 1, message: "Min 1" }, max: { value: 3, message: "Max 3" },
                       })}
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                    />
-
-                    <p className="mt-1 text-xs text-stone-400">
-                      PoolDhaka currently supports up to 3 seats.
-                    </p>
-
-                    {errors.capacity && (
-                      <p className="mt-1 text-xs text-red-500">
-                        {errors.capacity.message}
-                      </p>
-                    )}
+                      style={inputStyle(errors.capacity)} />
+                    {errors.capacity && <p style={errStyle}>{errors.capacity.message}</p>}
                   </div>
-
-                  {/* Submit */}
-
-                  <button
-                    type="submit"
-                    className="w-full rounded-xl bg-orange-500 px-5 py-3 font-semibold text-white transition hover:bg-orange-600"
-                  >
-                    Add Vehicle
-                  </button>
-
+                  <button type="submit" style={{ ...greenBtnStyle, marginTop: 8 }}>Add Vehicle</button>
                 </form>
               </div>
             </div>
           )}
 
-          {/* =====================================
-              CREATE POOL VIEW
-          ===================================== */}
-
+          {/* ─── CREATE POOL ─── */}
           {view === "createPool" && (
-            <div>
-
-              <button
-                onClick={() => {
-                  setSelectedVehicle(null);
-                  setView("vehicles");
-                }}
-                className="mb-5 text-sm font-medium text-stone-600 transition hover:text-slate-900"
-              >
-                ← Back to Vehicles
-              </button>
-
-              <div className="rounded-3xl border border-stone-200 bg-[#fffcef]  p-7 shadow-sm">
-
-                <h2 className="text-2xl font-bold">
-                  Create Pool
-                </h2>
-
-                <p className="mt-1 text-sm text-stone-500">
-                  Create a shared ride pool using your vehicle.
-                </p>
-
+            <div className="fade-in" style={{ maxWidth: 480 }}>
+              <button onClick={() => { setSelectedVehicle(null); setView("vehicles"); }} style={backBtnStyle}>← Back to vehicles</button>
+              <div style={cardStyle}>
+                <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Create Pool</h2>
+                <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 24 }}>Create a shared ride pool using your vehicle.</p>
                 {selectedVehicle && (
-                  <div className="mt-7 rounded-2xl border border-orange-200 bg-orange-50 p-5">
-
-                    <div className="flex items-center gap-4">
-
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-xl">
-                        🚗
+                  <div style={{ background: "rgba(0,232,122,0.06)", border: "1px solid rgba(0,232,122,0.2)", borderRadius: 10, padding: 20, marginBottom: 24 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{selectedVehicle.vehicleName}</div>
+                    <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{selectedVehicle.vehicleType} · {selectedVehicle.plateNumber}</div>
+                    <div style={{ marginTop: 14, display: "flex", gap: 12 }}>
+                      <div style={{ flex: 1, background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>CAPACITY</div>
+                        <div style={{ fontWeight: 700 }}>{selectedVehicle.capacity} seats</div>
                       </div>
-
-                      <div>
-                        <p className="font-bold text-stone-900">
-                          {selectedVehicle.vehicleName}
-                        </p>
-
-                        <p className="text-sm text-stone-500">
-                          {selectedVehicle.vehicleType} ·{" "}
-                          {selectedVehicle.plateNumber}
-                        </p>
+                      <div style={{ flex: 1, background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>POOL SIZE</div>
+                        <div style={{ fontWeight: 700 }}>{selectedVehicle.capacity} seats</div>
                       </div>
-
                     </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-3">
-
-                      <div className="rounded-xl bg-white p-4">
-                        <p className="text-xs text-stone-400">
-                          Vehicle Capacity
-                        </p>
-
-                        <p className="mt-1 font-bold">
-                          {selectedVehicle.capacity} seats
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl bg-white p-4">
-                        <p className="text-xs text-stone-400">
-                          Pool Capacity
-                        </p>
-
-                        <p className="mt-1 font-bold">
-                          {selectedVehicle.capacity} seats
-                        </p>
-                      </div>
-
-                    </div>
-
                   </div>
                 )}
-
-                <form
-                  onSubmit={handleCreatePool}
-                  className="mt-6"
-                >
-                  <button
-                    type="submit"
-                    className="w-full rounded-xl bg-orange-500 px-5 py-3 font-semibold text-white transition hover:bg-orange-600"
-                  >
-                    Create Pool
-                  </button>
+                <form onSubmit={handleCreatePool}>
+                  <button type="submit" style={greenBtnStyle}>Open Pool →</button>
                 </form>
-
               </div>
             </div>
           )}
 
-          {/* =====================================
-              CURRENT POOL VIEW
-          ===================================== */}
+          {/* ─── CURRENT POOL ─── */}
           {view === "currentPool" && (
-            <div className="space-y-6">
+            <div className="fade-in">
               {poolLoading ? (
-                <div className="rounded-3xl border border-stone-200 bg-[#fffcef] p-8 text-center">
-                  <p className="text-stone-500">
-                    Loading current pool...
-                  </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-muted)" }}>
+                  <div style={{ width: 20, height: 20, border: "2px solid var(--border2)", borderTop: "2px solid var(--green)", borderRadius: "50%" }} className="spin" />
+                  Loading current pool…
                 </div>
               ) : !currentPool ? (
-                <div className="rounded-3xl border border-stone-200 bg-[#fffcef] p-10 text-center">
-                  <div className="text-5xl">👥</div>
-
-                  <h3 className="mt-4 text-xl font-bold text-stone-800">
-                    No Active Pool
-                  </h3>
-
-                  <p className="mt-2 text-sm text-stone-500">
-                    You don't have an active pool right now.
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() => setView("createPool")}
-                    className="mt-6 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
-                  >
-                    Create Pool
-                  </button>
+                <div>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>No Active Pool</h2>
+                  <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 20 }}>You don't have an active pool right now.</p>
+                  <button onClick={() => setView("vehicles")} style={greenBtnStyle}>Go to Vehicles</button>
                 </div>
               ) : (
-                <div className="space-y-6 rounded-3xl border border-stone-200 bg-[#fffcef] p-6 shadow-sm">
-
-                  {/* Pool Header */}
-                  <div>
-                    <h2 className="mt-1 text-3xl font-bold text-stone-800">
-                      Current Pool
-                    </h2>
-
-                    <p className="mt-2 text-stone-500">
-                      Manage your active ride pool and passengers.
-                    </p>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
+                    <h2 style={{ fontSize: 30, fontWeight: 900 }}>Current Pool</h2>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", border: "1px solid var(--green)", borderRadius: 20, padding: "4px 12px" }}>
+                      {currentPool.status}
+                    </div>
                   </div>
 
-                  {/* Pool Summary */}
-                  <div className="grid gap-4 sm:grid-cols-3">
-
-                    <div className="rounded-3xl border border-stone-200 p-6">
-                      <p className="text-sm text-stone-500">
-                        Pool Status
-                      </p>
-
-                      <p className="mt-2 text-2xl font-bold text-stone-800">
-                        {currentPool.status}
-                      </p>
-                    </div>
-
-                    <div className="rounded-3xl border border-stone-200 p-6">
-                      <p className="text-sm text-stone-500">
-                        Occupied Seats
-                      </p>
-
-                      <p className="mt-2 text-2xl font-bold text-stone-800">
-                        {currentPool.occupiedSeats}
-                      </p>
-                    </div>
-
-                    <div className="rounded-3xl border border-stone-200 p-6">
-                      <p className="text-sm text-stone-500">
-                        Available Seats
-                      </p>
-
-                      <p className="mt-2 text-2xl font-bold text-stone-800">
-                        {currentPool.availableSeats}
-                      </p>
-                    </div>
-
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+                    {[
+                      { label: "Occupied Seats", value: currentPool.occupiedSeats },
+                      { label: "Available Seats", value: currentPool.availableSeats },
+                      { label: "Total Capacity", value: currentPool.maxCapacity },
+                    ].map(s => (
+                      <div key={s.label} style={cardStyle}>
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>{s.label}</div>
+                        <div style={{ fontSize: 32, fontWeight: 900, color: "var(--green)" }}>{s.value ?? "—"}</div>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Vehicle */}
-                  <div className="rounded-3xl border border-stone-200 p-6">
-                    <h3 className="text-lg font-bold text-stone-800">
-                      Vehicle
-                    </h3>
-
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-
-                      <div>
-                        <p className="text-xs text-stone-400">
-                          Vehicle
-                        </p>
-
-                        <p className="mt-1 font-semibold text-stone-700">
-                          {currentPool.vehicle?.vehicleName}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-xs text-stone-400">
-                          Plate Number
-                        </p>
-
-                        <p className="mt-1 font-semibold text-stone-700">
-                          {currentPool.vehicle?.plateNumber}
-                        </p>
-                      </div>
-
-                    </div>
+                  {/* Vehicle info */}
+                  <div style={{ ...cardStyle, marginBottom: 24 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>Vehicle</div>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>{currentPool.vehicle?.vehicleName}</div>
+                    <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{currentPool.vehicle?.vehicleType} · {currentPool.vehicle?.plateNumber}</div>
                   </div>
 
                   {/* Passengers */}
-                  <div className="rounded-3xl border border-stone-200 p-6">
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-bold text-stone-800">
-                          Passengers
-                        </h3>
-
-                        <p className="mt-1 text-sm text-stone-500">
-                          {currentPool.members?.length || 0} passenger(s) joined
-                        </p>
-                      </div>
+                  <div style={{ ...cardStyle }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 16, textTransform: "uppercase", letterSpacing: 1 }}>
+                      Passengers ({currentPool.members?.length || 0})
                     </div>
-
-                    {currentPool.members?.length === 0 ? (
-                      <div className="mt-6 rounded-2xl p-6 text-center">
-                        <p className="text-sm text-stone-500">
-                          No passengers have joined your pool yet.
-                        </p>
-                      </div>
+                    {!currentPool.members?.length ? (
+                      <p style={{ color: "var(--text-dim)", fontSize: 13 }}>No passengers yet.</p>
                     ) : (
-                      <div className="mt-6 space-y-4">
-
-                        {currentPool.members.map((member) => (
-
-                          <div
-                            key={member.id}
-                            className="rounded-2xl border border-stone-200 p-4"
-                          >
-
-                            {/* Passenger Header */}
-                            <div className="flex items-start justify-between gap-4">
-
+                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        {currentPool.members.map(m => (
+                          <div key={m.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                               <div>
-                                <h4 className="font-semibold text-stone-800">
-                                  {member.passenger?.name}
-                                </h4>
-
-                                <p className="mt-1 text-sm text-stone-500">
-                                  {member.passenger?.phone || "No phone number"}
-                                </p>
+                                <div style={{ fontWeight: 700 }}>{m.passenger?.name}</div>
+                                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{m.passenger?.phone || "No phone"}</div>
                               </div>
-
-                              <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-600">
-                                {member.rideRequest?.status}
-                              </span>
-
+                              <StatusBadge status={m.rideRequest?.status} />
                             </div>
-
-                            {/* Ride Information */}
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-
-                              <div>
-                                <p className="text-xs text-stone-400">
-                                  Pickup
-                                </p>
-
-                                <p className="mt-1 text-sm text-stone-700">
-                                  {member.rideRequest?.pickupAddress}
-                                </p>
-                              </div>
-
-                              <div>
-                                <p className="text-xs text-stone-400">
-                                  Drop-off
-                                </p>
-
-                                <p className="mt-1 text-sm text-stone-700">
-                                  {member.rideRequest?.dropoffAddress}
-                                </p>
-                              </div>
-
-                              <div>
-                                <p className="text-xs text-stone-400">
-                                  Seats
-                                </p>
-
-                                <p className="mt-1 text-sm font-semibold text-stone-700">
-                                  {member.rideRequest?.seats}
-                                </p>
-                              </div>
-
-                              <div>
-                                <p className="text-xs text-stone-400">
-                                  Pool Fare
-                                </p>
-
-                                <p className="mt-1 text-sm font-semibold text-orange-600">
-                                  ৳{member.fareAmount}
-                                </p>
-                              </div>
-
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, marginBottom: 14 }}>
+                              <div><span style={{ color: "var(--text-dim)" }}>Pickup: </span>{m.rideRequest?.pickupAddress}</div>
+                              <div><span style={{ color: "var(--text-dim)" }}>Drop-off: </span>{m.rideRequest?.dropoffAddress}</div>
+                              <div><span style={{ color: "var(--text-dim)" }}>Seats: </span>{m.rideRequest?.seats}</div>
+                              <div><span style={{ color: "var(--text-dim)" }}>Fare: </span><span style={{ color: "var(--green)", fontWeight: 700 }}>৳{m.fareAmount}</span></div>
                             </div>
-
-                            {/* Driver Arrived Button */}
-                            {member.rideRequest?.status === "MATCHED" && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDriverArrived(
-                                    member.rideRequest.id
-                                  )
-                                }
-                                className="mt-4 w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
-                              >
-                                🚗 Driver Arrived
-                              </button>
+                            {m.rideRequest?.status === "MATCHED" && (
+                              <button onClick={() => handleDriverArrived(m.rideRequest.id)} style={greenBtnStyle}>🚗 Driver Arrived</button>
                             )}
-
-                            {/* Driver Arrived Status */}
-                            {member.rideRequest?.status === "DRIVER_ARRIVED" && (
-                              <div className="mt-4 rounded-xl bg-green-50 px-4 py-3 text-center text-sm font-semibold text-green-600">
-                                ✓ Driver Arrived
-                              </div>
+                            {m.rideRequest?.status === "DRIVER_ARRIVED" && (
+                              <button onClick={() => handleStartRide(m.rideRequest.id)} style={greenBtnStyle}>▶ Start Ride</button>
                             )}
-
-                            {member.rideRequest?.status === "DRIVER_ARRIVED" && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleStartRide(member.rideRequest.id)
-                                }
-                                className="mt-4 w-full rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
-                              >
-                                ▶ Start Ride
-                              </button>
+                            {m.rideRequest?.status === "STARTED" && (
+                              <button onClick={() => handleCompleteRide(m.rideRequest.id)} style={greenBtnStyle}>✓ Complete Ride</button>
                             )}
-
-                            {member.rideRequest?.status === "STARTED" && (
-                              <div className="mt-4 rounded-xl bg-blue-50 px-4 py-3 text-center text-sm font-semibold text-blue-600">
-                                🚗 Ride Started
-                              </div>
-                            )}
-                            {member.rideRequest?.status === "STARTED" && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleCompleteRide(member.rideRequest.id)
-                                }
-                                className="mt-4 w-full rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
-                              >
-                                ✓ Complete Ride
-                              </button>
-                            )}
-
-                            {member.rideRequest?.status === "COMPLETED" && (
-                              <div className="mt-4 rounded-xl bg-green-50 px-4 py-3 text-center text-sm font-semibold text-green-600">
+                            {m.rideRequest?.status === "COMPLETED" && (
+                              <div style={{ padding: "8px 14px", background: "rgba(0,232,122,0.1)", borderRadius: 8, fontSize: 12, color: "var(--green)", fontWeight: 700 }}>
                                 ✓ Ride Completed
                               </div>
                             )}
-
                           </div>
-
                         ))}
-
                       </div>
                     )}
-
                   </div>
-
                 </div>
               )}
             </div>
           )}
-        </section>
 
-        {/* =========================================
-            RIGHT SIDEBAR
-        ========================================= */}
-
-        <aside className="space-y-5">
-
-          {/* DRIVER INFO */}
-
-          <div className="rounded-3xl border border-stone-200 bg-[#fffcef] p-6 shadow-sm">
-
-            <div className="flex items-center gap-4">
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-lg font-bold text-orange-700">
-                {user?.name
-                  ?.charAt(0)
-                  ?.toUpperCase() || "D"}
+          {/* ─── RECENT RIDES ─── */}
+          {view === "vehicles" && (
+            <div style={{ marginTop: 48 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800 }}>Recent rides</h3>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Last 30 days</span>
               </div>
-
-              <div className="min-w-0">
-
-                <p className="truncate font-bold">
-                  {user?.name || "Driver"}
-                </p>
-
-                <p className="truncate text-sm text-stone-500">
-                  Driver
-                </p>
-
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                {recentRides.length === 0 ? (
+                  <div style={{ gridColumn: "1/-1", color: "var(--text-dim)", fontSize: 13 }}>No recent rides.</div>
+                ) : recentRides.map(r => (
+                  <div key={r.id} style={{ ...cardStyle }}>
+                    <StatusBadge status={r.status} />
+                    <div style={{ fontWeight: 700, marginTop: 8, fontSize: 14 }}>
+                      {r.pickupAddress} → {r.dropoffAddress}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                      {new Date(r.createdAt).toLocaleDateString("en-BD", { day: "numeric", month: "short" })} · {new Date(r.createdAt).toLocaleTimeString("en-BD", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                    {r.estimatedFare && (
+                      <div style={{ fontWeight: 800, color: "var(--green)", marginTop: 10 }}>৳{r.estimatedFare}</div>
+                    )}
+                  </div>
+                ))}
               </div>
-
             </div>
+          )}
+        </div>
 
-            {user?.email && (
-              <p className="mt-4 truncate text-xs text-stone-400">
-                {user.email}
-              </p>
-            )}
-
-          </div>
-
-          {/* STATS */}
-
-          <div className="rounded-3xl border border-stone-200 bg-[#fffcef] p-6 shadow-sm">
-
-            <h3 className="font-bold">
-              Your Stats
-            </h3>
-
-            <div className="mt-5 space-y-4">
-
-              <div className="flex justify-between">
-                <span className="text-sm text-stone-500">
-                  Vehicles
-                </span>
-
-                <span className="font-bold">
-                  {vehicles.length}
-                </span>
+        {/* Right Sidebar */}
+        <div style={{ width: 280, background: "var(--bg2)", padding: "32px 24px", display: "flex", flexDirection: "column", gap: 0 }}>
+          {/* Driver Profile */}
+          <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: 24, marginBottom: 24 }}>
+            <SectionLabel>DRIVER PROFILE</SectionLabel>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <img src={jashimDriver} alt={user?.name} style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>{user?.name || "Driver"}</div>
+                <div style={{ fontSize: 12, color: "var(--green)", marginTop: 2 }}>PoolDhaka driver</div>
               </div>
-
-              <div className="flex justify-between">
-                <span className="text-sm text-stone-500">
-                  Pool capacity
-                </span>
-
-                <span className="font-bold">
-                  {vehicles.length > 0
-                    ? vehicles.reduce(
-                      (total, vehicle) =>
-                        total + vehicle.capacity,
-                      0
-                    )
-                    : 0}
-                </span>
-              </div>
-
             </div>
-
           </div>
 
-          {/* NAVIGATION */}
-
-          <div className="rounded-3xl border border-stone-200 bg-[#fffcef] p-3 shadow-sm">
-
-            {vehicles.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setView("vehicles")}
-                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-stone-600 hover:bg-stone-50"
-              >
-                <span>🚗</span>
-                <span>My Vehicles</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => {
-                reset();
-                setView("addVehicle");
-              }}
-              className={`w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition ${view === "addVehicle"
-                ? "bg-orange-100 text-orange-600"
-                : "hover:bg-stone-50"
-                }`}
-            >
-              ➕ Add Vehicle
-            </button>
-
-            <button
-              type="button"
-              disabled={vehicles.length === 0 || hasActivePool}
-              onClick={() => setView("createPool")}
-              className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
-                vehicles.length === 0 || hasActivePool
-                  ? "cursor-not-allowed text-stone-300"
-                  : view === "createPool"
-                  ? "bg-orange-100 text-orange-600"
-                  : "text-stone-600 hover:bg-stone-50"
-              }`}
-            >
-              <span>🚘</span>
-              <span>Create Pool</span>
-              {hasActivePool && (
-                <span className="ml-auto text-xs">🔒</span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setView("currentPool")}
-              className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
-                view === "currentPool"
-                  ? "bg-orange-50 text-orange-600"
-                  : "text-stone-600 hover:bg-stone-50"
-              }`}
-            >
-              <span className="flex items-center gap-3">
-                <span>👥</span>
-                <span>Current Pool</span>
-              </span>
-              {hasActivePool && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-green-500" />
-              )}
-            </button>
+          {/* Fleet Status */}
+          <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: 24, marginBottom: 24 }}>
+            <SectionLabel>FLEET STATUS</SectionLabel>
+            <div style={{ fontSize: 48, fontWeight: 900, color: "var(--green)", lineHeight: 1, marginBottom: 4 }}>
+              {String(vehicles.length).padStart(2, "0")}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>registered vehicles</div>
           </div>
 
-        </aside>
+          {/* Current Route */}
+          <div style={{ marginBottom: 24 }}>
+            <SectionLabel>CURRENT ROUTE</SectionLabel>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 6, background: "rgba(0,232,122,0.15)", border: "1px solid var(--green)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "var(--green)", fontSize: 13 }}>A</div>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Awaiting a pool</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "var(--text-muted)", fontSize: 13 }}>B</div>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Choose your destination</span>
+              </div>
+            </div>
+          </div>
 
-      </main>
+          {/* Nav */}
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 20, marginTop: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+            {[
+              { label: "Vehicles", action: () => setView("vehicles"), active: view === "vehicles" },
+              { label: "+ Add Vehicle", action: () => { reset(); setView("addVehicle"); }, active: view === "addVehicle" },
+              { label: "Current Pool", action: () => setView("currentPool"), active: view === "currentPool" },
+            ].map(n => (
+              <button key={n.label} onClick={n.action} style={{
+                background: n.active ? "rgba(0,232,122,0.1)" : "none",
+                border: n.active ? "1px solid rgba(0,232,122,0.3)" : "1px solid transparent",
+                borderRadius: 8, padding: "9px 14px", fontSize: 13,
+                fontWeight: n.active ? 700 : 500, color: n.active ? "var(--green)" : "var(--text-muted)",
+                cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+              }}>{n.label}</button>
+            ))}
+          </div>
+
+          {/* Breadcrumb */}
+          <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border)", display: "flex", gap: 6, fontSize: 10, color: "var(--text-dim)", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", flexWrap: "wrap" }}>
+            <span>MIRPUR</span><span style={{ color: "var(--green)" }}>→</span>
+            <span>DHANMONDI</span><span style={{ color: "var(--green)" }}>→</span>
+            <span>MOTIJHEEL</span><span style={{ color: "var(--green)" }}>→</span>
+            <span>UTTARA</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
+/* ── style helpers ── */
+const greenBtnStyle = {
+  width: "100%", padding: "11px 0", borderRadius: 8,
+  background: "var(--green)", color: "#000",
+  fontWeight: 800, fontSize: 13, border: "none", cursor: "pointer",
+  transition: "opacity 0.2s",
+};
+
+const ghostBtnStyle = {
+  padding: "10px 16px", borderRadius: 8, border: "1px solid var(--border2)",
+  background: "none", color: "var(--text-muted)", fontWeight: 600,
+  fontSize: 13, cursor: "pointer",
+};
+
+const cardStyle = {
+  background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)",
+  borderRadius: 12, padding: 20,
+};
+
+const labelStyle = {
+  fontSize: 10, fontWeight: 700, color: "var(--text-muted)",
+  letterSpacing: 1.5, textTransform: "uppercase", display: "block", marginBottom: 8,
+};
+
+const inputStyle = (hasErr) => ({
+  width: "100%", padding: "12px 14px",
+  background: "#1a1a1a", border: `1px solid ${hasErr ? "rgba(239,68,68,0.5)" : "var(--border2)"}`,
+  borderRadius: 8, color: "#fff", fontSize: 14, outline: "none",
+});
+
+const errStyle = { fontSize: 11, color: "#f87171", marginTop: 5 };
+
+const backBtnStyle = {
+  background: "none", border: "none", color: "var(--text-muted)", fontSize: 13,
+  fontWeight: 600, cursor: "pointer", marginBottom: 20, padding: 0,
+};
+
 export default DriverDashboard;
-
-
