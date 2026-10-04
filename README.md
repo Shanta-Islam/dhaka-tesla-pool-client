@@ -1,16 +1,66 @@
-# React + Vite
+# Dhaka Tesla Pool 🚗⚡
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack ride-pooling platform that allows passengers to share rides, split fares, and join available pools in Dhaka.
 
-Currently, two official plugins are available:
+## 🚀 Live Project
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+* **Frontend:** (https://dhaka-tesla-pool-client-rouge.vercel.app/)
 
-## React Compiler
+## ✨ Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Passenger
 
-## Expanding the ESLint configuration
+* User registration and login
+* JWT-based authentication
+* Create ride requests
+* View available ride pools
+* Join an available pool
+* Select required seats
+* View active ride status
+* Track ride progress
+* Automatic ride status updates
+* Ride history
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Driver
+
+* Driver registration and login
+* Add and manage vehicles
+* Create a ride pool
+* Set pool capacity
+* View passengers in the pool
+* Update ride status
+* Driver Arrived → Start Ride → Complete Ride
+* Manage active pool
+
+### Pool Management
+
+* Real-time available seat calculation
+* Maximum pool capacity validation
+* Prevent duplicate pool membership
+* Pickup and drop-off distance validation
+* Automatic pool status updates
+* Fare sharing between passengers
+* Pool completion handling
+
+## 🛠️ Technologies
+
+### Frontend
+
+* React.js
+* Vite
+* Tailwind CSS
+* React Hook Form
+* TanStack Query
+* Axios
+* SweetAlert2
+* React Router
+
+### Backend
+
+* Node.js
+* Express.js
+* PostgreSQL
+* Prisma ORM
+* JWT Authentication
+* bcryptjs
+* Zod
