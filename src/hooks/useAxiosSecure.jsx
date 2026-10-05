@@ -4,7 +4,7 @@ import axios from "axios";
 const useAxiosSecure = () => {
   const axiosSecure = useMemo(() => {
     const instance = axios.create({
-      baseURL: "https://dhaka-tesla-pool-server-9u5b.onrender.com/api",
+      baseURL: "http://localhost:5000/api",
     });
 
     instance.interceptors.request.use(

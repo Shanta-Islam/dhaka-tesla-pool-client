@@ -1,0 +1,507 @@
+/* ══════════════════════════════════════════
+   App.css — PoolDhaka Auth Page Styles
+   ══════════════════════════════════════════ */
+
+/* ── Auth wrapper ── */
+.auth-wrapper {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* ── Left panel ── */
+.left-panel {
+  min-height: 100vh;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Left panel top bar ── */
+.left-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.left-topbar-badge {
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+/* ── Left panel hero ── */
+.left-hero {
+  flex: 1;
+  padding: 60px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.left-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.left-h1 {
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -2px;
+  margin-bottom: 24px;
+}
+
+.left-h1-accent {
+  color: var(--green);
+}
+
+.left-p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 340px;
+}
+
+.left-p span {
+  color: #fff;
+}
+
+/* ── Route visualization ── */
+.route-row {
+  margin-top: 64px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.route-line {
+  flex: 1;
+  height: 1.5px;
+  background: var(--border2);
+  margin: 21px 0 0;
+}
+
+/* ── RouteStop ── */
+.route-stop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.route-stop-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.route-stop-label {
+  text-align: center;
+}
+
+.route-stop-tag {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.route-stop-sublabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+}
+
+/* ── Driver card ── */
+.driver-card {
+  margin: 0 32px 32px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.driver-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--green);
+  flex-shrink: 0;
+}
+
+.driver-card-info {
+  flex: 1;
+}
+
+.driver-card-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.driver-card-title span {
+  color: var(--green);
+}
+
+.driver-card-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ── Breadcrumb bar (left panel bottom) ── */
+.breadcrumb-bar {
+  padding: 12px 32px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.breadcrumb-bar .arrow {
+  color: var(--green);
+}
+
+/* ── Logo ── */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo-icon span {
+  font-weight: 900;
+  font-size: 16px;
+  color: #000;
+  letter-spacing: -1px;
+}
+
+.logo-name {
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.5px;
+}
+
+.logo-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-left: 2px;
+}
+
+/* ── Right panel ── */
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg2);
+}
+
+/* ── Right panel top bar ── */
+.right-topbar {
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.right-topbar-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+/* ── Form area ── */
+.auth-form-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.auth-form-inner {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* ── Form headings ── */
+.form-breadcrumb {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.auth-heading {
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  line-height: 1.05;
+  margin-bottom: 8px;
+}
+
+.form-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+/* ── Role toggle ── */
+.role-toggle {
+  display: flex;
+  background: #222;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 22px;
+  gap: 4px;
+}
+
+.role-btn {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 6px;
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.role-btn.active {
+  background: var(--green);
+  color: #000;
+}
+
+/* ── Alert boxes ── */
+.alert-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #f87171;
+}
+
+.alert-success {
+  background: rgba(0, 232, 122, 0.1);
+  border: 1px solid rgba(0, 232, 122, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--green);
+}
+
+/* ── Form fields ── */
+.field {
+  margin-bottom: 14px;
+}
+
+.field-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.field-input {
+  width: 100%;
+  padding: 13px 16px;
+  background: #1e1e1e;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field-input.has-error {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.field-input:focus {
+  border-color: var(--green);
+}
+
+.field-err {
+  font-size: 11px;
+  color: #f87171;
+  margin-top: 5px;
+}
+
+/* ── Forgot password ── */
+.forgot-row {
+  text-align: right;
+  margin-bottom: 20px;
+}
+
+.forgot-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ── Submit button ── */
+.submit-btn {
+  width: 100%;
+  padding: 14px 0;
+  border-radius: 8px;
+  background: var(--green);
+  color: #000;
+  font-weight: 800;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+.submit-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: var(--green-dim);
+}
+
+/* ── Switch row ── */
+.switch-row {
+  text-align: center;
+  margin-top: 22px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.switch-btn {
+  background: none;
+  border: none;
+  color: var(--green);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── Right panel bottom breadcrumb ── */
+.auth-breadcrumb-bar {
+  padding: 14px 40px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.auth-breadcrumb-bar .arrow {
+  color: var(--green);
+}
+
+/* ── Auth loading spinner ── */
+.auth-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.auth-loading-inner {
+  text-align: center;
+}
+
+.auth-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border2);
+  border-top: 3px solid var(--green);
+  border-radius: 50%;
+  margin: 0 auto;
+}
+
+.auth-loading-text {
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ══════════════════════════════════════════
+   Responsive overrides (already in index.css
+   for class names shared with dashboard)
+   ══════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .left-panel { display: none !important; }
+  .right-panel { flex: 1 !important; }
+}
+
+@media (max-width: 640px) {
+  .right-topbar { padding: 16px 20px !important; }
+  .auth-form-area {
+    padding: 28px 20px !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+  }
+  .auth-form-inner { max-width: 100% !important; }
+  .auth-heading { font-size: 32px !important; }
+  .auth-breadcrumb-bar { padding: 10px 20px !important; }
+  .left-h1 { font-size: 36px !important; }
+  .left-hero { padding: 40px 28px !important; }
+}

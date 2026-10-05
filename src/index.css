@@ -63,3 +63,66 @@ input, select, textarea, button { font-family: inherit; }
   50% { opacity: 0.5; transform: scale(0.8); }
 }
 .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+/* ── Responsive helpers ── */
+.hide-mobile { display: flex; }
+.show-mobile { display: none; }
+
+/* Tablet ≤ 900px */
+@media (max-width: 900px) {
+  .auth-left-panel { display: none !important; }
+  .auth-right-panel { flex: 1 !important; }
+  .dash-sidebar {
+    width: 260px !important;
+  }
+}
+
+/* Mobile ≤ 640px */
+@media (max-width: 640px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: flex !important; }
+
+  /* Auth page */
+  .auth-wrapper { flex-direction: column !important; }
+  .auth-mobile-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .auth-right-panel {
+    flex: 1 !important;
+    background: var(--bg) !important;
+  }
+  .auth-form-area {
+    padding: 28px 20px !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+  }
+  .auth-form-inner {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .auth-heading { font-size: 32px !important; }
+  .auth-breadcrumb-bar { padding: 10px 20px !important; }
+
+  /* Dashboard */
+  .dash-layout { flex-direction: column !important; }
+  .dash-sidebar {
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  .dash-main { overflow: auto; }
+  .dash-confirmed-header h1 { font-size: 28px !important; letter-spacing: -0.5px !important; }
+  .dash-journey-card { max-width: 100% !important; }
+  .dash-driver-card { max-width: 100% !important; }
+  .dash-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .dash-stats-row > div { padding: 12px 14px !important; }
+  .dash-stats-row > div div:first-child { font-size: 20px !important; }
+  .dash-confirmed-pad { padding: 20px 16px !important; }
+}

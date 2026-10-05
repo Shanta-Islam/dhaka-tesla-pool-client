@@ -48,6 +48,8 @@ const PassengerDashboard = ({ user, onLogout }) => {
   const [seats, setSeats] = useState(1);
   const [pickupIdx, setPickupIdx] = useState(0);
   const [dropIdx, setDropIdx] = useState(2);
+  const [confirmedRide, setConfirmedRide] = useState(null);
+  const [isBookingAnother, setIsBookingAnother] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -67,17 +69,41 @@ const PassengerDashboard = ({ user, onLogout }) => {
       const r = await axiosSecure.get("/rides/my-rides");
       return r.data.rides || [];
     },
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
-  const activeRide = myRides.find(r => ["MATCHED", "DRIVER_ARRIVED", "STARTED"].includes(r.status));
+  const activeRide = myRides.find(r => ["MATCHED", "DRIVER_ARRIVED", "STARTED", "COMPLETED", "CANCELLED"].includes(r.status));
   const recentRides = myRides.filter(r => ["COMPLETED", "CANCELLED"].includes(r.status)).slice(0, 3);
 
   useEffect(() => {
-    if (ridesLoading) return;
-    if (activeRide) setView("activeRide");
-    else setView("book");
-  }, [activeRide, ridesLoading]);
+    if (ridesLoading || isBookingAnother) return;
+
+    // 1. Active ride থাকলে সেটাই confirmed ride
+    if (activeRide) {
+      setConfirmedRide(activeRide);
+      setView("confirmed");
+      return;
+    }
+
+    // 2. আগে থেকে confirmed ride থাকলে
+    // API থেকে তার latest version নিয়ে আসবে
+    if (confirmedRide) {
+      const latestRide = myRides.find(
+        (ride) => ride.id === confirmedRide.id
+      );
+
+      if (latestRide) {
+        setConfirmedRide(latestRide);
+        setView("confirmed");
+        return;
+      }
+    }
+  }, [
+    activeRide,
+    myRides,
+    ridesLoading,
+    isBookingAnother,
+  ]);
 
   /* fare estimate */
   const pickupLoc = LOCATIONS[pickupIdx];
@@ -86,17 +112,14 @@ const PassengerDashboard = ({ user, onLogout }) => {
     const R = 6371;
     const dLat = ((dropLoc.lat - pickupLoc.lat) * Math.PI) / 180;
     const dLng = ((dropLoc.lng - pickupLoc.lng) * Math.PI) / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(pickupLoc.lat*Math.PI/180)*Math.cos(dropLoc.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(pickupLoc.lat * Math.PI / 180) * Math.cos(dropLoc.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1);
   })();
   const fareEst = Math.round(distKm * FARE_PER_KM);
   const durationMin = Math.round(distKm * 2.4);
 
   /* submit ride */
   const handleRideSubmit = async () => {
-    if (!selectedPool && pools.length > 0) {
-      setSelectedPool(pools[0]);
-    }
     const pool = selectedPool || pools[0];
     if (!pool) {
       Swal.fire({ icon: "warning", title: "No pool available", text: "No open pools found right now.", confirmButtonColor: "#00e87a" });
@@ -110,16 +133,59 @@ const PassengerDashboard = ({ user, onLogout }) => {
         dropoffLat: dropLoc.lat, dropoffLng: dropLoc.lng,
         seats, estimatedFare: fareEst,
       });
-      await axiosSecure.post("/pools/join", {
+      const joinRes = await axiosSecure.post("/pools/join", {
         poolId: pool.id,
         rideRequestId: rideRes.data.ride.id,
       });
-      await Swal.fire({ icon: "success", title: "Ride Confirmed!", text: "Your shared ride has been booked.", confirmButtonColor: "#00e87a" });
+      /* refetch so we get the full ride object with pool + statusHistory */
+      const refreshed = await axiosSecure.get("/rides/my-rides");
+      const rides = refreshed.data.rides || [];
+      const matched = rides.find(r => r.id === rideRes.data.ride.id) || rideRes.data.ride;
+      setIsBookingAnother(false);
+      setConfirmedRide(matched);
+      setView("confirmed");
       refetchRides();
-      setView("activeRide");
     } catch (e) {
       Swal.fire({ icon: "error", title: "Failed!", text: e.response?.data?.message || "Could not book ride.", confirmButtonColor: "#00e87a" });
     }
+  };
+
+  const handleCancelConfirmed = async () => {
+    if (!confirmedRide?.id) return;
+
+    try {
+      await axiosSecure.patch("/rides/cancel", {
+        rideRequestId: confirmedRide.id,
+      });
+
+      await refetchRides();
+
+      setIsBookingAnother(true);
+      setConfirmedRide(null);
+      setView("book");
+
+      Swal.fire({
+        icon: "success",
+        title: "Ride cancelled",
+        text: "Your ride has been cancelled successfully.",
+        confirmButtonColor: "#00e87a",
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Cancellation failed",
+        text:
+          error.response?.data?.message ||
+          "Could not cancel the ride.",
+        confirmButtonColor: "#00e87a",
+      });
+    }
+  };
+  const handleBookAnotherRide = () => {
+    setIsBookingAnother(true);
+    setConfirmedRide(null);
+    setSelectedPool(null);
+    setView("book");
   };
 
   if (poolsLoading || ridesLoading) return (
@@ -146,22 +212,24 @@ const PassengerDashboard = ({ user, onLogout }) => {
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
       <Header user={user} onLogout={onLogout} />
 
-      <div style={{ flex: 1, display: "flex" }}>
+      <div style={{ flex: 1, display: "flex" }} className="dash-layout">
 
         {/* LEFT SIDEBAR — booking form */}
-        <div style={{
+        <div className="dash-sidebar" style={{
           width: 280, background: "var(--bg2)", borderRight: "1px solid var(--border)",
           display: "flex", flexDirection: "column", flexShrink: 0, overflow: "auto",
         }}>
-      
-          {/* Journey form */}
+
+          {/* Journey form / confirmed summary */}
           <div style={{ padding: "20px 20px", flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
                 <SectionLabel>YOUR JOURNEY</SectionLabel>
-                <h2 style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>Book a shared ride</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>
+                  {view === "confirmed" ? "Your shared ride" : "Book a shared ride"}
+                </h2>
               </div>
-              <span style={{ fontSize: 18 }}>⇌</span>
+              <span style={{ fontSize: 18 }}>&#8651;</span>
             </div>
 
             {/* Pickup */}
@@ -171,7 +239,12 @@ const PassengerDashboard = ({ user, onLogout }) => {
                 <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 5, background: "rgba(0,232,122,0.2)", border: "1.5px solid var(--green)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <span style={{ fontSize: 8, fontWeight: 800, color: "var(--green)" }}>A</span>
                 </div>
-                <select value={pickupIdx} onChange={e => setPickupIdx(Number(e.target.value))} style={selectStyle}>
+                <select
+                  value={view === "confirmed" ? LOCATIONS.findIndex(l => l.label === confirmedRide?.pickupAddress) : pickupIdx}
+                  onChange={e => setPickupIdx(Number(e.target.value))}
+                  disabled={view === "confirmed"}
+                  style={{ ...selectStyle, opacity: view === "confirmed" ? 0.65 : 1 }}
+                >
                   {LOCATIONS.map((l, i) => <option key={i} value={i}>{l.label}</option>)}
                 </select>
               </div>
@@ -184,7 +257,12 @@ const PassengerDashboard = ({ user, onLogout }) => {
                 <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 5, background: "rgba(255,255,255,0.06)", border: "1.5px solid var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <span style={{ fontSize: 8, fontWeight: 800, color: "var(--text-muted)" }}>B</span>
                 </div>
-                <select value={dropIdx} onChange={e => setDropIdx(Number(e.target.value))} style={selectStyle}>
+                <select
+                  value={view === "confirmed" ? LOCATIONS.findIndex(l => l.label === confirmedRide?.dropoffAddress) : dropIdx}
+                  onChange={e => setDropIdx(Number(e.target.value))}
+                  disabled={view === "confirmed"}
+                  style={{ ...selectStyle, opacity: view === "confirmed" ? 0.65 : 1 }}
+                >
                   {LOCATIONS.map((l, i) => <option key={i} value={i}>{l.label}</option>)}
                 </select>
               </div>
@@ -194,11 +272,15 @@ const PassengerDashboard = ({ user, onLogout }) => {
             <div style={{ marginBottom: 20 }}>
               <label style={lblStyle}>SEATS</label>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1a1a1a", border: "1px solid var(--border2)", borderRadius: 8, padding: "10px 14px" }}>
-                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{seats} rider{seats > 1 ? "s" : ""}</span>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                  {view === "confirmed" ? confirmedRide?.seats : seats} rider{(view === "confirmed" ? confirmedRide?.seats : seats) > 1 ? "s" : ""}
+                </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button onClick={() => setSeats(s => Math.max(1, s - 1))} style={seatBtnStyle}>−</button>
-                  <span style={{ fontSize: 16, fontWeight: 800, minWidth: 20, textAlign: "center" }}>{seats}</span>
-                  <button onClick={() => setSeats(s => Math.min(3, s + 1))} style={seatBtnStyle}>+</button>
+                  <button onClick={() => setSeats(s => Math.max(1, s - 1))} disabled={view === "confirmed"} style={seatBtnStyle}>&#8722;</button>
+                  <span style={{ fontSize: 16, fontWeight: 800, minWidth: 20, textAlign: "center" }}>
+                    {view === "confirmed" ? confirmedRide?.seats : seats}
+                  </span>
+                  <button onClick={() => setSeats(s => Math.min(3, s + 1))} disabled={view === "confirmed"} style={seatBtnStyle}>+</button>
                 </div>
               </div>
             </div>
@@ -206,12 +288,17 @@ const PassengerDashboard = ({ user, onLogout }) => {
             {/* Fare estimate */}
             <div style={{ background: "rgba(0,232,122,0.06)", border: "1px solid rgba(0,232,122,0.2)", borderRadius: 10, padding: 14, marginBottom: 18 }}>
               <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>FARE ESTIMATE</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff" }}>৳{fareEst * seats}</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>৳{fareEst} / seat · {durationMin} min · {distKm} km</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff" }}>
+                &#2547;{view === "confirmed" ? confirmedRide?.estimatedFare : fareEst * seats}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                &#2547;{view === "confirmed" ? confirmedRide?.estimatedFare : fareEst} / seat
+                {view !== "confirmed" && ` · ${durationMin} min · ${distKm} km`}
+              </div>
             </div>
 
-            {/* Pool picker */}
-            {pools.length > 0 && (
+            {/* Pool picker — only when booking */}
+            {view !== "confirmed" && pools.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <label style={lblStyle}>SELECT POOL</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -233,15 +320,111 @@ const PassengerDashboard = ({ user, onLogout }) => {
               </div>
             )}
 
-            {/* CTA */}
-            <button onClick={handleRideSubmit} style={{
-              width: "100%", padding: "13px 0", borderRadius: 8,
-              background: "var(--green)", color: "#000", fontWeight: 800, fontSize: 13,
-              border: "none", cursor: "pointer", letterSpacing: 0.5,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            }}>
-              CONFIRM SHARED RIDE ↗
-            </button>
+            {/* CTA / MATCHED button */}
+            {view === "confirmed" ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button style={{
+                  width: "100%",
+                  padding: "13px 0",
+                  opacity: 0.75,
+                  borderRadius: 8,
+                  background:
+                    confirmedRide?.status === "COMPLETED"
+                      ? "rgba(0,232,122,0.15)"
+                      : "var(--green)",
+                  color:
+                    confirmedRide?.status === "COMPLETED"
+                      ? "var(--green)"
+                      : "#000",
+                  fontWeight: 800,
+                  fontSize: 13,
+                  border: "none",
+                  cursor: "default",
+                  letterSpacing: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}>
+                  {confirmedRide?.status === "MATCHED" && "POOL MATCHED ✓"}
+
+                  {confirmedRide?.status === "DRIVER_ARRIVED" && "DRIVER ARRIVED ✓"}
+
+                  {confirmedRide?.status === "STARTED" && "RIDE IN PROGRESS"}
+
+                  {confirmedRide?.status === "COMPLETED" && "RIDE COMPLETED ✓"}
+                </button>
+
+                <div style={{
+                  fontSize: 11,
+                  color: "var(--green)",
+                  textAlign: "center",
+                  fontWeight: 600
+                }}>
+                  {confirmedRide?.status === "MATCHED" &&
+                    `Ride matched · ${confirmedRide?.pool?.driver?.name || "Driver"}`}
+
+                  {confirmedRide?.status === "DRIVER_ARRIVED" &&
+                    `Driver arrived · ${confirmedRide?.pool?.driver?.name || "Driver"}`}
+
+                  {confirmedRide?.status === "STARTED" &&
+                    `Ride in progress · ${confirmedRide?.pool?.driver?.name || "Driver"}`}
+
+                  {confirmedRide?.status === "COMPLETED" &&
+                    "You have reached your destination"}
+                </div>
+                {/* Cancel Ride — active rides only */}
+                {["MATCHED", "DRIVER_ARRIVED"].includes(confirmedRide?.status) && (
+                  <button
+                    onClick={handleCancelConfirmed}
+                    style={{
+                      width: "100%",
+                      padding: "9px 0",
+                      borderRadius: 8,
+                      marginTop: 2,
+                      background: "transparent",
+                      color: "#f87171",
+                      fontWeight: 600,
+                      fontSize: 12,
+                      border: "1px solid rgba(248,113,113,0.3)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel Ride
+                  </button>
+                )}
+
+                {/* Book Another Ride — after completion/cancellation */}
+                {["COMPLETED", "CANCELLED"].includes(confirmedRide?.status) && (
+                  <button
+                    onClick={handleBookAnotherRide}
+                    style={{
+                      width: "100%",
+                      padding: "9px 0",
+                      borderRadius: 8,
+                      marginTop: 2,
+                      background: "transparent",
+                      color: "var(--text-muted)",
+                      fontWeight: 600,
+                      fontSize: 12,
+                      border: "1px solid var(--border2)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Book another ride
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button onClick={handleRideSubmit} style={{
+                width: "100%", padding: "13px 0", borderRadius: 8,
+                background: "var(--green)", color: "#000", fontWeight: 800, fontSize: 13,
+                border: "none", cursor: "pointer", letterSpacing: 0.5,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              }}>
+                CONFIRM SHARED RIDE &#8599;
+              </button>
+            )}
           </div>
 
           {/* Recent rides */}
@@ -274,7 +457,7 @@ const PassengerDashboard = ({ user, onLogout }) => {
         </div>
 
         {/* MAIN AREA */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }} className="grid-bg">
+        <div className="dash-main" style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "auto" }}>
 
           {/* ─── BOOK VIEW: route visualization ─── */}
           {(view === "book" || view === "pools") && (
@@ -364,114 +547,253 @@ const PassengerDashboard = ({ user, onLogout }) => {
             </div>
           )}
 
-          {/* ─── ACTIVE RIDE VIEW ─── */}
-          {view === "activeRide" && activeRide && (
-            <div style={{ padding: "28px 40px" }} className="fade-in">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          {/* ─── CONFIRMED / ACTIVE RIDE VIEW — "You're in the pool." ─── */}
+          {(view === "confirmed" || view === "activeRide") && confirmedRide && (
+            <div className="dash-confirmed-pad fade-in" style={{ padding: "28px 40px", flex: 1, display: "flex", flexDirection: "column" }}>
+
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--green)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
-                    LIVE RIDE / {activeRide.id?.slice(0, 5).toUpperCase()}
-                  </div>
-                  <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: -1 }}>Your route</h2>
-                  <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>
-                    {activeRide.pickupAddress} → {activeRide.dropoffAddress}
-                  </div>
-                </div>
-              </div>
-
-              {/* Status banner */}
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                background: "rgba(0,232,122,0.1)", border: "1px solid rgba(0,232,122,0.3)",
-                borderRadius: 20, padding: "6px 16px", marginBottom: 40, fontSize: 13, fontWeight: 600, color: "var(--green)",
-              }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)" }} className="pulse-dot" />
-                {activeRide.status === "MATCHED" && "Driver matched · ETA 4 min"}
-                {activeRide.status === "DRIVER_ARRIVED" && "Driver arrived · ETA 4 min"}
-                {activeRide.status === "STARTED" && "Ride in progress"}
-              </div>
-
-              {/* Route diagram */}
-              <div style={{ display: "flex", alignItems: "center", marginBottom: 0, maxWidth: 600 }}>
-                <RouteStop letter="A" color="var(--green)" label="PICKUP" sublabel={activeRide.pickupAddress} />
-                <div style={{ flex: 1, height: 1.5, background: "var(--green)", margin: "0 0 24px", opacity: 0.4 }} />
-                <RouteStop letter="M" color="#f97316" label="VIA" sublabel="Mohakhali" />
-                <div style={{ flex: 1, height: 1.5, background: "var(--border2)", margin: "0 0 24px" }} />
-                <RouteStop letter="B" color="var(--text-muted)" label="DROP-OFF" sublabel={activeRide.dropoffAddress} />
-              </div>
-
-              {/* Stats */}
-              <div style={{ display: "flex", gap: 1, borderTop: "1px solid var(--border)", marginBottom: 40, maxWidth: 600 }}>
-                {[
-                  { value: "18", label: "MINUTES" },
-                  { value: "7.4", label: "KILOMETRES" },
-                  { value: "3", label: "STOPS" },
-                ].map((s, i) => (
-                  <div key={i} style={{ flex: 1, padding: "20px 0", borderRight: i < 2 ? "1px solid var(--border)" : "none", textAlign: i === 0 ? "left" : i === 2 ? "right" : "center" }}>
-                    <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1 }}>{s.value}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 2, marginTop: 4 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pool info */}
-              {activeRide.pool && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: "var(--text-muted)" }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>Your pool</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: "var(--green)", fontWeight: 700 }}>
-                      {activeRide.pool.members?.length || 0}/{activeRide.pool.maxCapacity} seats matched
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    {confirmedRide.status === "COMPLETED" ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="3.5"><polyline points="20 6 9 17 4 12" /></svg>
+                    ) : (
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--green)" }} className="pulse-dot" />
+                    )}
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", letterSpacing: 2, textTransform: "uppercase" }}>
+                      {confirmedRide.status === "MATCHED" && "Ride Matched"}
+                      {confirmedRide.status === "DRIVER_ARRIVED" && "Driver Arrived"}
+                      {confirmedRide.status === "STARTED" && "Ride In Progress"}
+                      {confirmedRide.status === "COMPLETED" && "Ride Completed"}
+                      {!["MATCHED", "DRIVER_ARRIVED", "STARTED", "COMPLETED"].includes(confirmedRide.status) && "Ride Matched"}
                     </span>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <img src={jashimDriver} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover" }} />
-                        <div>
-                          <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-                            {activeRide.pool.driver?.name || "Driver"}
-                            <span style={{ fontSize: 12, color: "#f59e0b" }}>★ 4.9</span>
-                          </div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                            {activeRide.pool.vehicle?.vehicleType} · {activeRide.pool.vehicle?.plateNumber}
-                          </div>
-                          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 1 }}>
-                            Battery-powered · {activeRide.pool.maxCapacity} seats
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxWidth: 260 }}>
-                        {(activeRide.pool.members || []).map((m, i) => (
-                          <div key={i} style={{ fontSize: 11, fontWeight: 700, background: i === 0 ? "rgba(0,232,122,0.15)" : "rgba(255,255,255,0.06)", color: i === 0 ? "var(--green)" : "var(--text-muted)", borderRadius: 20, padding: "4px 12px" }}>
-                            {m.passenger?.name?.split(" ")[0] || "Passenger"}{i === 0 ? " · You" : " · Matched"}
-                          </div>
-                        ))}
-                        {[...Array(Math.max(0, (activeRide.pool.maxCapacity || 3) - (activeRide.pool.members?.length || 0)))].map((_, i) => (
-                          <div key={`open-${i}`} style={{ fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,0.04)", color: "var(--text-dim)", borderRadius: 20, padding: "4px 12px" }}>
-                            Seat {(activeRide.pool.members?.length || 0) + i + 1} · Open
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  <h1 className="dash-confirmed-header" style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1.5, lineHeight: 1, marginBottom: 8, color: "#fff" }}>
+                    {confirmedRide.status === "COMPLETED" ? "Ride complete." : "You\u2019re in the pool."}
+                  </h1>
+                  <div style={{ fontSize: 14, color: "var(--text-muted)" }}>
+                    {confirmedRide.pickupAddress} &#8594; {confirmedRide.dropoffAddress}
                   </div>
                 </div>
-              )}
+                <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "right", marginTop: 6, flexShrink: 0 }}>
+                  {new Date(confirmedRide.updatedAt || confirmedRide.createdAt).toLocaleString("en-BD", {
+                    day: "numeric", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit", second: "2-digit",
+                  })}
+                </div>
+              </div>
 
-              {/* Fare info */}
-              <div style={{ marginTop: 24, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, maxWidth: 600 }}>
-                {[
-                  { label: "FARE", value: `৳${activeRide.estimatedFare}` },
-                  { label: "SEATS", value: activeRide.seats },
-                  { label: "STATUS", value: activeRide.status },
-                ].map(s => (
-                  <div key={s.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>{s.label}</div>
-                    <div style={{ fontWeight: 800, fontSize: 16, color: s.label === "STATUS" ? "var(--green)" : "#fff" }}>{s.value}</div>
+              {/* Journey card */}
+              <div className="dash-journey-card" style={{
+                background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)",
+                borderRadius: 14, overflow: "hidden", marginBottom: 24, maxWidth: 720,
+              }}>
+                {/* Card header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid var(--border)" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: 2 }}>YOUR JOURNEY</span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 800,
+                    background:
+                      confirmedRide.status === "COMPLETED" ? "rgba(0,232,122,0.1)"
+                        : confirmedRide.status === "STARTED" ? "rgba(0,232,122,0.15)"
+                          : confirmedRide.status === "DRIVER_ARRIVED" ? "rgba(249,115,22,0.15)"
+                            : "rgba(59,130,246,0.12)",
+                    color:
+                      (confirmedRide.status === "COMPLETED" || confirmedRide.status === "STARTED") ? "var(--green)"
+                        : confirmedRide.status === "DRIVER_ARRIVED" ? "#fb923c"
+                          : "#60a5fa",
+                    borderRadius: 20, padding: "3px 12px", letterSpacing: 1,
+                  }}>
+                    {confirmedRide.status === "MATCHED" && "POOL MATCHED"}
+                    {confirmedRide.status === "DRIVER_ARRIVED" && "DRIVER ARRIVED"}
+                    {confirmedRide.status === "STARTED" && "IN PROGRESS"}
+                    {confirmedRide.status === "COMPLETED" && "COMPLETED ✓"}
+                    {!["MATCHED", "DRIVER_ARRIVED", "STARTED", "COMPLETED"].includes(confirmedRide.status) && (confirmedRide.pool?.status || "POOL OPEN")}
+                  </span>
+                </div>
+
+                {/* Pickup */}
+                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 7, flexShrink: 0,
+                    background: "rgba(0,232,122,0.15)", border: "1.5px solid var(--green)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: "var(--green)" }}>A</span>
                   </div>
-                ))}
+                  <div>
+                    <div style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 3 }}>PICKUP</div>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{confirmedRide.pickupAddress}</div>
+                  </div>
+                </div>
+
+                {/* Drop-off */}
+                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 7, flexShrink: 0,
+                    background: "rgba(255,255,255,0.06)", border: "1.5px solid var(--border2)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: "var(--text-muted)" }}>B</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 3 }}>DROP-OFF</div>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{confirmedRide.dropoffAddress}</div>
+                  </div>
+                </div>
+
+                {/* Stats row */}
+                <div className="dash-stats-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: "1px solid var(--border)" }}>
+                  {[
+                    { value: `\u09F3${confirmedRide.estimatedFare}`, label: "ESTIMATED FARE", green: true },
+                    { value: confirmedRide.seats, label: "YOUR SEAT" },
+                    { value: confirmedRide.pool?.maxCapacity ?? 3, label: "POOL CAPACITY" },
+                  ].map((s, i) => (
+                    <div key={i} style={{ padding: "18px 20px", borderRight: i < 2 ? "1px solid var(--border)" : "none" }}>
+                      <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1, color: s.green ? "var(--green)" : "#fff" }}>
+                        {s.value}
+                      </div>
+                      <div style={{ fontSize: 9, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 1.5, marginTop: 5, textTransform: "uppercase" }}>
+                        {s.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── LIVE STATUS TIMELINE ── */}
+                <div style={{ padding: "18px 20px 8px" }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+                    letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 18,
+                    display: "flex", alignItems: "center", gap: 8,
+                  }}>
+                    <span>RIDE STATUS</span>
+                    {confirmedRide.status !== "COMPLETED" && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 800, background: "rgba(0,232,122,0.1)",
+                        color: "var(--green)", borderRadius: 20, padding: "2px 8px", letterSpacing: 1,
+                      }}>LIVE</span>
+                    )}
+                  </div>
+
+                  {(() => {
+                    const STEPS = [
+                      { key: "MATCHED", title: "Ride Matched", sub: "Confirmed & pooled with other passengers" },
+                      { key: "DRIVER_ARRIVED", title: "Driver Arrived", sub: "Your driver is at the pickup point" },
+                      { key: "STARTED", title: "Ride Started", sub: "On the way to your destination" },
+                      { key: "COMPLETED", title: "Ride Completed", sub: "You have reached your destination" },
+                    ];
+                    const currentIdx = STEPS.findIndex(s => s.key === confirmedRide.status);
+
+                    return STEPS.map((step, idx) => {
+                      const isDone = idx < currentIdx;
+                      const isCurrent = idx === currentIdx;
+                      const isLast = idx === STEPS.length - 1;
+
+                      return (
+                        <div key={step.key} style={{ display: "flex", gap: 14 }}>
+                          {/* Dot + connector */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 24, flexShrink: 0 }}>
+                            <div style={{
+                              width: 24, height: 24, borderRadius: "50%",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              background: isDone ? "rgba(0,232,122,0.18)" : isCurrent ? "rgba(0,232,122,0.08)" : "rgba(255,255,255,0.04)",
+                              border: (isDone || isCurrent) ? "1.5px solid var(--green)" : "1.5px solid var(--border2)",
+                            }}>
+                              {isDone ? (
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="3.5">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              ) : isCurrent ? (
+                                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--green)" }} className="pulse-dot" />
+                              ) : (
+                                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--border2)" }} />
+                              )}
+                            </div>
+                            {!isLast && (
+                              <div style={{
+                                width: 1.5, minHeight: 24, margin: "3px 0",
+                                background: isDone ? "rgba(0,232,122,0.4)" : "var(--border)",
+                                borderRadius: 2,
+                              }} />
+                            )}
+                          </div>
+
+                          {/* Text */}
+                          <div style={{ paddingBottom: isLast ? 8 : 20 }}>
+                            <div style={{
+                              fontSize: 13, fontWeight: 700,
+                              color: isCurrent ? "var(--green)" : isDone ? "#fff" : "var(--text-dim)",
+                              marginBottom: 2,
+                            }}>
+                              {step.title}
+                            </div>
+                            {(isDone || isCurrent) && (
+                              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{step.sub}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Driver & vehicle */}
+              <div className="dash-driver-card" style={{ maxWidth: 720 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: "var(--text-muted)" }}>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>Your driver &amp; vehicle</span>
+                </div>
+
+                <div style={{
+                  background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)",
+                  borderRadius: 14, padding: "16px 20px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    {/* Driver avatar initials */}
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                      background: "rgba(0,232,122,0.15)", border: "1.5px solid var(--green)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: "var(--green)" }}>
+                        {(confirmedRide.pool?.driver?.name || "RA").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 800 }}>
+                        {confirmedRide.pool?.driver?.name || "Driver"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                        {confirmedRide.pool?.driver?.phone || ""}
+                      </div>
+                      {confirmedRide.pool?.vehicle && (
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
+                          {confirmedRide.pool.vehicle.vehicleName} &middot; {confirmedRide.pool.vehicle.plateNumber}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: "rgba(0,232,122,0.1)", border: "1px solid rgba(0,232,122,0.35)",
+                    color: "var(--green)", borderRadius: 8, padding: "9px 16px",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.24h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.85a16 16 0 0 0 6.07 6.07l1.87-1.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                    Call driver
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -602,3 +924,5 @@ const seatBtnStyle = {
 };
 
 export default PassengerDashboard;
+
+
